@@ -6,7 +6,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from constrictor.core.ignore import load_ignore_patterns, should_exclude
-from constrictor.core.models import ScanOptions, ScanWarning, Certainty
+from constrictor.core.models import Certainty, ScanOptions, ScanWarning
 
 _TOPOLOGY_CONFIG_NAMES = frozenset(
     [

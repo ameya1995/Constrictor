@@ -448,14 +448,17 @@ async def _tool_diff_impact(args: dict[str, Any], graph_path: str) -> list[types
         return _error_text(str(exc))
 
     if not diff_text and not changes:
-        return _error_text("Either 'diff' (unified diff string) or 'changes' (list of {file_path, line_start, line_end}) is required.")
+        return _error_text(
+            "Either 'diff' (unified diff string) or 'changes' "
+            "(list of {file_path, line_start, line_end}) is required."
+        )
 
     try:
         engine = _load_engine(graph_path)
     except FileNotFoundError as exc:
         return _error_text(str(exc))
 
-    from constrictor.analysis.diff import parse_diff, ChangedRegion
+    from constrictor.analysis.diff import ChangedRegion, parse_diff
 
     if diff_text:
         regions = parse_diff(diff_text)
@@ -531,7 +534,7 @@ async def _tool_batch_impact(args: dict[str, Any], graph_path: str) -> list[type
     except Exception as exc:
         return _error_text(str(exc))
 
-    from constrictor.export.format_output import format_nodes, format_edges
+    from constrictor.export.format_output import format_nodes
 
     if fmt == "files":
         files = sorted({n.file_path for n in subgraph["nodes"] if n.file_path})

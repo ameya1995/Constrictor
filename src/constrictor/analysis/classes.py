@@ -178,7 +178,11 @@ class ClassHierarchyExtractor:
                     source_id=cls_id,
                     target_id=base_id,
                     type=edge_type,
-                    display_name=f"{cls_qname} {'implements' if edge_type == EdgeType.IMPLEMENTS else 'inherits'} {base_qname}",
+                    display_name=(
+                        f"{cls_qname} "
+                        f"{'implements' if edge_type == EdgeType.IMPLEMENTS else 'inherits'} "
+                        f"{base_qname}"
+                    ),
                     file_path=mod_fp,
                     line_number=stmt.lineno,
                     certainty=certainty,

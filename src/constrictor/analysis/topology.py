@@ -326,7 +326,10 @@ class TopologyContributor:
                 source_id=edge.source_id,
                 target_id=edge.target_id,
                 type=EdgeType.CROSSES_COMPONENT_BOUNDARY,
-                display_name=f"{src_node.display_name} -> {tgt_node.display_name} [cross-boundary: {src_name} -> {tgt_name}]",
+                display_name=(
+                        f"{src_node.display_name} -> {tgt_node.display_name}"
+                        f" [cross-boundary: {src_name} -> {tgt_name}]"
+                    ),
                 file_path=edge.file_path,
                 line_number=edge.line_number,
                 certainty=edge.certainty,

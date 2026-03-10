@@ -410,7 +410,6 @@ def _collect_fragments(
     files: list[Path],
 ) -> list[FileFragment]:
     """Extract the subset of nodes/edges from `document` that belong to `files`."""
-    file_keys: set[str] = {str(p.resolve()) for p in files}
     fragments: list[FileFragment] = []
 
     for p in files:

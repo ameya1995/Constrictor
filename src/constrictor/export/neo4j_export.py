@@ -6,7 +6,6 @@ from pathlib import Path
 
 from constrictor.graph.models import GraphDocument
 
-
 _NODES_HEADERS = [":ID", "name:string", "qualified_name:string", "type:string", ":LABEL"]
 _EDGES_HEADERS = [":START_ID", ":END_ID", ":TYPE", "display_name:string", "certainty:string"]
 

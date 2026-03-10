@@ -22,7 +22,7 @@ from constrictor.core.models import ScanOptions
 from constrictor.core.orchestrator import run_scan
 from constrictor.export.json_export import export_json, load_json
 from constrictor.export.summary import generate_summary
-from constrictor.graph.query import GraphQueryEngine, NodeNotFoundError
+from constrictor.graph.query import GraphQueryEngine
 
 app = typer.Typer(
     name="constrictor",
@@ -104,7 +104,7 @@ def export_neo4j_cmd(
     document = run_scan(options)
     export_neo4j(document, output_dir)
     console.print(f"[bold]Neo4j CSV written to:[/bold] {output_dir}")
-    console.print(f"[dim]  nodes.csv, edges.csv[/dim]")
+    console.print("[dim]  nodes.csv, edges.csv[/dim]")
 
 
 @export_app.command("json")

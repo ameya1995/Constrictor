@@ -8,16 +8,15 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from constrictor.graph.models import (
+    EdgeType,
     GraphDocument,
     GraphEdge,
     GraphNode,
     GraphPathResult,
     GraphSubgraph,
     NodeType,
-    EdgeType,
 )
 from constrictor.graph.query import GraphQueryEngine, NodeNotFoundError
-from constrictor.core.models import ScanMetadata, ScanStatistics
 
 _STATIC_DIR = Path(__file__).parent / "static"
 

@@ -6,7 +6,7 @@ Parses a unified diff (output of ``git diff``) into a list of
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
@@ -36,8 +36,6 @@ def parse_diff(diff_text: str) -> list[ChangedRegion]:
     """
     regions: list[ChangedRegion] = []
     current_file: str | None = None
-    current_hunk_start: int = 1
-    current_hunk_end: int = 1
 
     for line in diff_text.splitlines():
         # New file header

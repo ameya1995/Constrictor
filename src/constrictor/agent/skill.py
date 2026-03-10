@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from importlib import resources
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape

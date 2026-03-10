@@ -16,7 +16,6 @@ from constrictor.graph.models import (
     GraphPath,
     GraphPathResult,
     GraphSubgraph,
-    NodeType,
 )
 
 
@@ -385,7 +384,11 @@ class GraphQueryEngine:
             elif nt == "FUNCTION":
                 # List direct callees
                 callees = [
-                    (self._nodes_by_id[e.target_id].display_name if e.target_id in self._nodes_by_id else e.display_name)
+                    (
+                        self._nodes_by_id[e.target_id].display_name
+                        if e.target_id in self._nodes_by_id
+                        else e.display_name
+                    )
                     for e in self._outgoing.get(node.id, [])
                     if e.type == EdgeType.CALLS
                 ]
@@ -430,7 +433,6 @@ class GraphQueryEngine:
           immediate         -- nodes one hop away from changed nodes
           transitive        -- all further reachable nodes
         """
-        from constrictor.graph.models import EdgeType
         from constrictor.export.format_output import format_nodes
 
         # Build path -> nodes index for fast lookup

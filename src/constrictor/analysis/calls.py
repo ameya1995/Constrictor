@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from constrictor.core.models import Certainty, ScanWarning
 from constrictor.core.parser import ParsedModule
