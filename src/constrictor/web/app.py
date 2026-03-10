@@ -110,7 +110,7 @@ def create_app(document: GraphDocument) -> FastAPI:
     if _STATIC_DIR.is_dir():
         app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
-        @app.get("/", response_class=HTMLResponse)
+        @app.get("/", response_class=HTMLResponse, response_model=None)
         def root() -> HTMLResponse | FileResponse:
             index = _STATIC_DIR / "index.html"
             if index.exists():
