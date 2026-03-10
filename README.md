@@ -30,10 +30,11 @@ pip install constrictor
 
 **Requirements:** Python ≥ 3.10
 
-**Optional dev dependencies:**
+**Optional extras:**
 
 ```bash
 pip install "constrictor[dev]"   # adds pytest, ruff, mypy
+pip install "constrictor[js]"    # adds JS/TS support via tree-sitter
 ```
 
 ---
@@ -71,6 +72,8 @@ constrictor scan <path> [options]
 | `-e`, `--exclude` | | Additional glob patterns to exclude (repeatable) |
 | `--exclude-file` | | Path to a file containing additional exclude patterns (repeatable) |
 | `-v`, `--verbose` | `False` | Show active ignore patterns, per-stage timings, and warnings |
+| `-i`, `--incremental` | `False` | Only re-analyze files that changed since the last scan (uses `.constrictor_cache/`) |
+| `--include-js` | `False` | Also parse `.js`, `.ts`, `.jsx`, `.tsx` files (requires `constrictor[js]`) |
 
 **Without `-o`:** prints a one-paragraph human-readable summary.  
 **With `-o graph.json`:** writes the full graph JSON; prints node/edge counts.
@@ -106,6 +109,10 @@ constrictor impact --node <id_or_name> [options]
 | `-d`, `--direction` | `downstream` | `downstream` (what this affects) or `upstream` (what depends on it) |
 | `--depth` | `6` | Maximum traversal depth |
 | `--no-ambiguous` | `False` | Exclude AMBIGUOUS and UNRESOLVED edges |
+| `--format` | `full` | Output format: `full`, `compact` (token-efficient), or `files` (file paths only) |
+| `--edge-type` | | Only traverse edges of these types (e.g. `CALLS`). Repeatable. |
+| `--node-type` | | Only include result nodes of these types. Repeatable. |
+| `--file-pattern` | | fnmatch glob to filter result nodes by file path |
 
 ```bash
 # What callers will be affected if I change greet()?
@@ -202,6 +209,113 @@ constrictor watch /path/to/project -o graph.json
 |---|---|---|
 | `-o`, `--output` | `graph.json` | Output file path |
 | `--debounce-ms` | `1500` | Debounce window for rapid saves |
+| `--incremental/--no-incremental` | on | Use incremental scanning on each rescan (default) or force a full rescan |
+
+---
+
+### `constrictor search`
+
+Search the dependency graph for nodes matching a name or pattern.
+
+```
+constrictor search <query> [options]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-g`, `--graph` | `graph.json` | Path to the graph JSON file |
+| `-t`, `--type` | | Restrict to these node types (e.g. `FUNCTION`, `CLASS`). Repeatable. |
+| `-f`, `--file` | | fnmatch glob to filter by file path |
+| `-l`, `--limit` | `10` | Maximum number of results |
+
+Results are ranked by match quality: exact > prefix > substring > regex.
+
+```bash
+constrictor search "create_order" --graph graph.json
+constrictor search "user" --type FUNCTION --type METHOD --limit 20
+```
+
+---
+
+### `constrictor context`
+
+Show all graph entities defined in a single file: classes, functions, endpoints, models, imports, and callers.
+
+```
+constrictor context <file_path> [options]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-g`, `--graph` | `graph.json` | Path to the graph JSON file |
+
+```bash
+constrictor context app/routes/users.py --graph graph.json
+# Shows: Imports, Imported by, Functions, Classes, Endpoints
+```
+
+---
+
+### `constrictor diff-impact`
+
+Find the blast radius for all code changed in a git diff. Reads a unified diff and maps each changed line range to graph nodes, producing a tiered impact report: directly changed → immediate dependents → transitive dependents.
+
+```
+constrictor diff-impact [options]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--diff` | (stdin) | Path to a unified diff file; reads from stdin if omitted |
+| `-g`, `--graph` | `graph.json` | Path to the graph JSON file |
+| `--format` | `compact` | Output format: `full`, `compact`, or `files` |
+
+```bash
+git diff HEAD~1 | constrictor diff-impact --graph graph.json
+constrictor diff-impact --diff my.patch --graph graph.json --format files
+```
+
+---
+
+### `constrictor unused`
+
+List functions, methods, and classes that have no incoming edges — dead code candidates.
+
+```
+constrictor unused [options]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-g`, `--graph` | `graph.json` | Path to the graph JSON file |
+| `-t`, `--type` | `FUNCTION, METHOD, CLASS` | Node types to check. Repeatable. |
+| `-e`, `--exclude` | | fnmatch glob patterns for files to skip. Repeatable. |
+| `--entry-point` | | Node name patterns to treat as used (fnmatch). Repeatable. |
+
+```bash
+constrictor unused --graph graph.json
+constrictor unused --exclude "tests/*" --entry-point "main" --entry-point "cli_*"
+```
+
+---
+
+### `constrictor cycles`
+
+Detect circular dependencies in the graph. By default checks only `IMPORTS` and `IMPORTS_FROM` edges. Results are sorted by cycle length (shortest first).
+
+```
+constrictor cycles [options]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-g`, `--graph` | `graph.json` | Path to the graph JSON file |
+| `--edge-type` | `IMPORTS, IMPORTS_FROM` | Edge types to include. Repeatable. |
+
+```bash
+constrictor cycles --graph graph.json
+constrictor cycles --edge-type CALLS --graph graph.json
+```
 
 ---
 
@@ -215,6 +329,49 @@ constrictor serve --graph graph.json --port 8080
 ```
 
 Features: force-directed D3.js visualization, node coloring by type, click-to-inspect, search box, filter by node type, service boundary clusters.
+
+---
+
+### `constrictor mcp serve`
+
+Start the Constrictor MCP (Model Context Protocol) server so AI agents can query the dependency graph directly without shelling out to the CLI.
+
+```
+constrictor mcp serve [options]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-g`, `--graph` | | Path to a pre-built `graph.json`; when omitted callers pass `graph_path` per tool call |
+| `--auto-rescan` | `False` | Re-scan the project before each tool call |
+| `-t`, `--transport` | `stdio` | Transport: `stdio` (default) or `sse` |
+| `--host` | `127.0.0.1` | Host to bind (SSE only) |
+| `-p`, `--port` | `9000` | Port to listen on (SSE only) |
+
+**Available MCP tools:**
+
+| Tool | Description |
+|---|---|
+| `constrictor_scan` | Scan a project and build the graph |
+| `constrictor_impact` | Blast-radius analysis (downstream / upstream) |
+| `constrictor_paths` | Enumerate dependency paths between two nodes |
+| `constrictor_audit` | List ambiguous / unresolved edges |
+| `constrictor_dependents` | Find all dependents of a file |
+| `constrictor_summary` | Human-readable graph summary + statistics |
+| `constrictor_search` | Search nodes by name, type, or file pattern |
+| `constrictor_file_context` | All entities defined in a single file |
+| `constrictor_diff_impact` | Blast radius from a git diff or line ranges |
+| `constrictor_unused` | Find dead code candidates (no incoming edges) |
+| `constrictor_batch_impact` | Merged impact analysis for multiple nodes |
+| `constrictor_cycles` | Detect circular import dependencies |
+
+```bash
+# stdio transport (default — for Claude Code, Cursor, Copilot)
+constrictor mcp serve --graph graph.json
+
+# SSE transport (for HTTP-based agent runtimes)
+constrictor mcp serve --transport sse --port 9000
+```
 
 ---
 
@@ -363,10 +520,35 @@ Additional patterns can be passed with `--exclude` or `--exclude-file`.
 
 ## Agent Integration
 
-Constrictor includes a `SKILL.md` generator for use with AI agent runtimes:
+Constrictor ships with two agent integration paths: a `SKILL.md` generator for agent runtimes that load skill files, and a built-in MCP server for agents that support the Model Context Protocol.
+
+### SKILL.md (skill-file agents)
 
 ```bash
 constrictor agent skill -o SKILL.md
+```
+
+### MCP server (Claude Code, Cursor, Copilot, Codex)
+
+```bash
+# 1. Scan and save the graph
+constrictor scan . -o graph.json
+
+# 2. Start the MCP server (stdio transport)
+constrictor mcp serve --graph graph.json
+```
+
+Add to your agent config (e.g. `.claude/mcp.json` or `~/.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "constrictor": {
+      "command": "constrictor",
+      "args": ["mcp", "serve", "--graph", "graph.json"]
+    }
+  }
+}
 ```
 
 ### Recommended agent workflows
@@ -380,11 +562,22 @@ constrictor impact --node "app.services::process_order" --graph graph.json
 
 **Before reviewing a PR:**
 ```bash
-# Scan both branches, diff the graphs
+git diff HEAD~1 | constrictor diff-impact --graph graph.json
+# Or scan both branches and compare
 constrictor scan . -o before.json
 git checkout feature-branch
 constrictor scan . -o after.json
 # Compare node/edge counts, look for removed nodes (deleted functions)
+```
+
+**Finding dead code:**
+```bash
+constrictor unused --graph graph.json --exclude "tests/*"
+```
+
+**Detecting circular imports:**
+```bash
+constrictor cycles --graph graph.json
 ```
 
 **Tracing data flow through a system:**
@@ -409,7 +602,8 @@ The scan pipeline runs in six stages:
 ┌─────────────────────────────────────────────────────────────────┐
 │  1. scan_directory()        Walk the tree, apply ignore patterns│
 │  2. parse_all()             AST-parse every .py file            │
-│  3. GraphContributors       Ten extractors run in sequence:     │
+│     parse_all_js()          Parse .js/.ts/.jsx/.tsx (optional)  │
+│  3. GraphContributors       Extractors run in sequence:         │
 │       ImportExtractor          import/from-import edges         │
 │       ClassHierarchyExtractor  inheritance, CONTAINS            │
 │       CallGraphExtractor       function call edges              │
@@ -419,6 +613,9 @@ The scan pipeline runs in six stages:
 │       SQLAlchemyExtractor      declarative_base, relationships  │
 │       HTTPClientExtractor      requests/httpx calls             │
 │       TypeAnnotationExtractor  parameter/return type edges      │
+│       JSImportExtractor        JS/TS import edges (optional)    │
+│       JSCallExtractor          JS/TS function call edges        │
+│       JSHttpExtractor          JS/TS outbound HTTP calls        │
 │       TopologyContributor      docker-compose, Procfile         │
 │  4. post_process()          Tag cross-boundary edges            │
 │  5. builder.build()         Sort, deduplicate, compute stats    │
