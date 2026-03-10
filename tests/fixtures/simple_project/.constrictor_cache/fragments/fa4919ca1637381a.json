@@ -1,0 +1,18 @@
+{
+  "file_path": "/Users/ameyamunagekar/Library/CloudStorage/OneDrive-Personal/Documents/Projects/Constrictor/tests/fixtures/simple_project/app/__init__.py",
+  "nodes": [
+    {
+      "id": "mod:a172cedcae47474b",
+      "type": "MODULE",
+      "name": "app",
+      "qualified_name": "app",
+      "display_name": "app",
+      "file_path": "/Users/ameyamunagekar/Library/CloudStorage/OneDrive-Personal/Documents/Projects/Constrictor/tests/fixtures/simple_project/app/__init__.py",
+      "line_number": null,
+      "column": null,
+      "certainty": 3,
+      "metadata": {}
+    }
+  ],
+  "edges": []
+}

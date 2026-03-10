@@ -1,0 +1,42 @@
+# Constrictor ignore patterns for this project
+# Lines starting with # are comments, blank lines are ignored
+
+# Python caches and build artifacts
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+dist
+build
+.eggs
+
+# Virtual environments
+.venv
+venv
+env
+.env
+
+# Version control
+.git
+
+# Node
+node_modules
+
+# Test and CI caches
+.tox
+.nox
+.mypy_cache
+.pytest_cache
+.ruff_cache
+
+# Coverage
+htmlcov
+.coverage
+.coverage.*
+
+# Hypothesis
+.hypothesis
+
+# Migrations (uncomment to exclude migration files from analysis)
+# migrations/

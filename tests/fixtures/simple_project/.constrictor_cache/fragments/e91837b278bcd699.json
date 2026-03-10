@@ -1,0 +1,65 @@
+{
+  "file_path": "/Users/ameyamunagekar/Library/CloudStorage/OneDrive-Personal/Documents/Projects/Constrictor/tests/fixtures/simple_project/app/utils.py",
+  "nodes": [
+    {
+      "id": "func:3740f96cdaa50c24",
+      "type": "FUNCTION",
+      "name": "helper",
+      "qualified_name": "app.utils::helper",
+      "display_name": "app.utils::helper",
+      "file_path": "/Users/ameyamunagekar/Library/CloudStorage/OneDrive-Personal/Documents/Projects/Constrictor/tests/fixtures/simple_project/app/utils.py",
+      "line_number": 5,
+      "column": null,
+      "certainty": 3,
+      "metadata": {}
+    },
+    {
+      "id": "func:83bae0bce7030eee",
+      "type": "FUNCTION",
+      "name": "greet",
+      "qualified_name": "app.utils::greet",
+      "display_name": "app.utils::greet",
+      "file_path": "/Users/ameyamunagekar/Library/CloudStorage/OneDrive-Personal/Documents/Projects/Constrictor/tests/fixtures/simple_project/app/utils.py",
+      "line_number": 1,
+      "column": null,
+      "certainty": 3,
+      "metadata": {}
+    },
+    {
+      "id": "mod:cb906460893fadfd",
+      "type": "MODULE",
+      "name": "app.utils",
+      "qualified_name": "app.utils",
+      "display_name": "app.utils",
+      "file_path": "/Users/ameyamunagekar/Library/CloudStorage/OneDrive-Personal/Documents/Projects/Constrictor/tests/fixtures/simple_project/app/utils.py",
+      "line_number": null,
+      "column": null,
+      "certainty": 3,
+      "metadata": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:29ae08423a182423",
+      "source_id": "mod:cb906460893fadfd",
+      "target_id": "func:3740f96cdaa50c24",
+      "type": "CONTAINS",
+      "display_name": "mod:cb906460893fadfd contains app.utils::helper",
+      "file_path": "/Users/ameyamunagekar/Library/CloudStorage/OneDrive-Personal/Documents/Projects/Constrictor/tests/fixtures/simple_project/app/utils.py",
+      "line_number": 5,
+      "certainty": 3,
+      "metadata": {}
+    },
+    {
+      "id": "edge:96fcdce2332ecfe4",
+      "source_id": "mod:cb906460893fadfd",
+      "target_id": "func:83bae0bce7030eee",
+      "type": "CONTAINS",
+      "display_name": "mod:cb906460893fadfd contains app.utils::greet",
+      "file_path": "/Users/ameyamunagekar/Library/CloudStorage/OneDrive-Personal/Documents/Projects/Constrictor/tests/fixtures/simple_project/app/utils.py",
+      "line_number": 1,
+      "certainty": 3,
+      "metadata": {}
+    }
+  ]
+}

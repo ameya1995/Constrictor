@@ -1,0 +1,101 @@
+{
+  "file_path": "/Users/ameyamunagekar/Library/CloudStorage/OneDrive-Personal/Documents/Projects/Constrictor/tests/fixtures/simple_project/app/main.py",
+  "nodes": [
+    {
+      "id": "func:7bcce4a44423c03d",
+      "type": "FUNCTION",
+      "name": "run_app",
+      "qualified_name": "app.main::run_app",
+      "display_name": "app.main::run_app",
+      "file_path": "/Users/ameyamunagekar/Library/CloudStorage/OneDrive-Personal/Documents/Projects/Constrictor/tests/fixtures/simple_project/app/main.py",
+      "line_number": 5,
+      "column": null,
+      "certainty": 3,
+      "metadata": {}
+    },
+    {
+      "id": "mod:ec36f8669ac98816",
+      "type": "MODULE",
+      "name": "app.main",
+      "qualified_name": "app.main",
+      "display_name": "app.main",
+      "file_path": "/Users/ameyamunagekar/Library/CloudStorage/OneDrive-Personal/Documents/Projects/Constrictor/tests/fixtures/simple_project/app/main.py",
+      "line_number": null,
+      "column": null,
+      "certainty": 3,
+      "metadata": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:60270c1ba2cc7235",
+      "source_id": "mod:ec36f8669ac98816",
+      "target_id": "mod:d7d693380fa9e966",
+      "type": "IMPORTS_FROM",
+      "display_name": "mod:ec36f8669ac98816 imports from app.models",
+      "file_path": "/Users/ameyamunagekar/Library/CloudStorage/OneDrive-Personal/Documents/Projects/Constrictor/tests/fixtures/simple_project/app/main.py",
+      "line_number": 2,
+      "certainty": 3,
+      "metadata": {
+        "names": "User"
+      }
+    },
+    {
+      "id": "edge:6a369ac08cad0917",
+      "source_id": "func:7bcce4a44423c03d",
+      "target_id": "func:24f9890cb7425792",
+      "type": "CALLS",
+      "display_name": "func:7bcce4a44423c03d calls app.models::User",
+      "file_path": "/Users/ameyamunagekar/Library/CloudStorage/OneDrive-Personal/Documents/Projects/Constrictor/tests/fixtures/simple_project/app/main.py",
+      "line_number": 6,
+      "certainty": 2,
+      "metadata": {}
+    },
+    {
+      "id": "edge:9902e69d2fad6cae",
+      "source_id": "func:7bcce4a44423c03d",
+      "target_id": "func:8b4d26177f47f1d6",
+      "type": "CALLS",
+      "display_name": "func:7bcce4a44423c03d calls <unresolved>::print",
+      "file_path": "/Users/ameyamunagekar/Library/CloudStorage/OneDrive-Personal/Documents/Projects/Constrictor/tests/fixtures/simple_project/app/main.py",
+      "line_number": 8,
+      "certainty": 1,
+      "metadata": {}
+    },
+    {
+      "id": "edge:d05241e9207a9c38",
+      "source_id": "func:7bcce4a44423c03d",
+      "target_id": "func:83bae0bce7030eee",
+      "type": "CALLS",
+      "display_name": "func:7bcce4a44423c03d calls app.utils::greet",
+      "file_path": "/Users/ameyamunagekar/Library/CloudStorage/OneDrive-Personal/Documents/Projects/Constrictor/tests/fixtures/simple_project/app/main.py",
+      "line_number": 7,
+      "certainty": 2,
+      "metadata": {}
+    },
+    {
+      "id": "edge:dfb05510a828bba0",
+      "source_id": "mod:ec36f8669ac98816",
+      "target_id": "func:7bcce4a44423c03d",
+      "type": "CONTAINS",
+      "display_name": "mod:ec36f8669ac98816 contains app.main::run_app",
+      "file_path": "/Users/ameyamunagekar/Library/CloudStorage/OneDrive-Personal/Documents/Projects/Constrictor/tests/fixtures/simple_project/app/main.py",
+      "line_number": 5,
+      "certainty": 3,
+      "metadata": {}
+    },
+    {
+      "id": "edge:f27718a34e81229e",
+      "source_id": "mod:ec36f8669ac98816",
+      "target_id": "mod:cb906460893fadfd",
+      "type": "IMPORTS_FROM",
+      "display_name": "mod:ec36f8669ac98816 imports from app.utils",
+      "file_path": "/Users/ameyamunagekar/Library/CloudStorage/OneDrive-Personal/Documents/Projects/Constrictor/tests/fixtures/simple_project/app/main.py",
+      "line_number": 1,
+      "certainty": 3,
+      "metadata": {
+        "names": "greet"
+      }
+    }
+  ]
+}

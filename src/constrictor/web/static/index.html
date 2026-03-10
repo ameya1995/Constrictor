@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Constrictor Graph Explorer</title>
+  <link rel="stylesheet" href="/static/app.css" />
+  <!-- D3.js via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+</head>
+<body>
+<div id="app">
+  <!-- Top Bar -->
+  <header id="topbar">
+    <h1>⬡ Constrictor</h1>
+    <input
+      id="search-box"
+      type="search"
+      placeholder="Search nodes by name…"
+      autocomplete="off"
+    />
+    <div id="filter-bar"></div>
+    <div id="stats-bar">Loading…</div>
+  </header>
+
+  <!-- Main area -->
+  <div id="main">
+    <!-- Graph canvas -->
+    <div id="graph-container">
+      <svg id="graph-svg">
+        <defs>
+          <marker id="arrowhead" markerWidth="8" markerHeight="6"
+                  refX="6" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#3a4060" />
+          </marker>
+          <marker id="arrowhead-hl" markerWidth="8" markerHeight="6"
+                  refX="6" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#7c6af5" />
+          </marker>
+        </defs>
+        <g id="zoom-group"></g>
+      </svg>
+    </div>
+
+    <!-- Detail sidebar -->
+    <aside id="sidebar">
+      <div id="sidebar-empty">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>
+        </svg>
+        <span>Click a node to explore it</span>
+      </div>
+      <div id="sidebar-content" style="display:none"></div>
+    </aside>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

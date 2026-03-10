@@ -1,0 +1,434 @@
+---
+name: constrictor
+version: {{ version }}
+description: >
+  Static dependency and blast-radius analyzer for Python codebases.
+  Answers "what breaks if I change X?" before you touch a line of code.
+tags: [python, static-analysis, dependency-graph, blast-radius, refactoring]
+---
+
+# Constrictor — Agent Skill
+
+Constrictor builds a static dependency graph for Python projects and lets you
+query it. Use it to understand blast radius, trace data flow, audit ambiguous
+dependencies, and map service boundaries — all before making changes.
+
+---
+
+## Quick Start
+
+```bash
+pip install constrictor
+
+# Scan a project and write the graph
+constrictor scan /path/to/project -o graph.json
+
+# Check what breaks if you change a function
+constrictor impact --node "app.utils::greet" --graph graph.json
+
+# Trace a path from an endpoint to the database
+constrictor paths --from "GET /users" --to "users" --graph graph.json
+
+# Print a human-readable summary
+constrictor summary --graph graph.json
+```
+
+---
+
+## Commands
+
+### `constrictor scan <path>`
+
+Scan a Python project and build the dependency graph.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-o, --output <file>` | (stdout summary) | Write graph JSON to this file |
+| `-e, --exclude <pattern>` | | Extra glob patterns to exclude (repeatable) |
+| `--exclude-file <file>` | | File containing extra exclude patterns |
+| `-v, --verbose` | false | Show timing, warnings, ignore-pattern count |
+
+```bash
+# Print summary only
+constrictor scan .
+
+# Write graph to file
+constrictor scan . -o graph.json
+
+# Exclude test directories
+constrictor scan . -o graph.json --exclude "tests/*" --exclude "fixtures/*"
+
+# Verbose: shows timings and parse warnings
+constrictor scan . -o graph.json --verbose
+```
+
+---
+
+### `constrictor impact`
+
+Show the blast radius of a node — which other nodes are affected if it changes.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--node <id_or_name>` | *required* | Node ID, qualified name, or display name |
+| `--graph <file>` | `graph.json` | Path to graph JSON |
+| `--direction <downstream\|upstream>` | `downstream` | Follow outgoing or incoming edges |
+| `--depth <int>` | `6` | Maximum traversal depth |
+
+```bash
+# What does greet() affect?
+constrictor impact --node "app.utils::greet" --graph graph.json
+
+# What does greet() depend on?
+constrictor impact --node "app.utils::greet" --graph graph.json --direction upstream
+
+# Blast radius of an entire module
+constrictor impact --node "app.utils" --graph graph.json --depth 8
+```
+
+---
+
+### `constrictor paths`
+
+Find all paths between two nodes. Useful for tracing data flow.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--from <id_or_name>` | *required* | Source node |
+| `--to <id_or_name>` | *required* | Target node |
+| `--graph <file>` | `graph.json` | Path to graph JSON |
+| `--depth <int>` | `8` | Maximum path length |
+
+```bash
+# Trace from endpoint to database table
+constrictor paths --from "POST /orders" --to "orders" --graph graph.json
+
+# Trace from a function to a model class
+constrictor paths --from "app.routes::create_order" --to "app.models::Order" --graph graph.json
+```
+
+---
+
+### `constrictor audit`
+
+List all ambiguous and unresolved edges that need human review.
+
+```bash
+constrictor audit --graph graph.json
+```
+
+---
+
+### `constrictor summary`
+
+Print a human-readable paragraph summarizing the graph.
+
+```bash
+constrictor summary --graph graph.json
+```
+
+---
+
+### `constrictor watch`
+
+Watch a project for file changes and re-scan automatically.
+
+```bash
+constrictor watch . -o graph.json
+constrictor watch . -o graph.json --debounce-ms 2000
+```
+
+---
+
+### `constrictor export`
+
+Export the graph to other formats.
+
+```bash
+# Neo4j bulk-import CSVs (nodes.csv, edges.csv)
+constrictor export neo4j . -o /tmp/neo4j/
+
+# JSON (alias for scan -o)
+constrictor export json . -o graph.json
+```
+
+---
+
+### `constrictor serve`
+
+Start a local web server for interactive graph visualization.
+
+```bash
+constrictor serve --graph graph.json --port 8080
+# Open http://127.0.0.1:8080 in a browser
+```
+
+---
+
+### `constrictor agent skill`
+
+Generate this SKILL.md file for distribution to agent runtimes.
+
+```bash
+constrictor agent skill -o SKILL.md
+```
+
+---
+
+## Workflow Patterns
+
+### Before refactoring a module
+
+```
+1. constrictor scan . -o graph.json
+2. constrictor impact --node "<target_module_or_function>" --graph graph.json
+3. Review the blast-radius output.
+   - If CROSSES_COMPONENT_BOUNDARY edges appear, this change affects multiple services.
+   - If AMBIGUOUS edges appear in the blast radius, flag them for human review.
+4. Proceed with the refactor knowing which files and functions will be impacted.
+```
+
+### Before reviewing a PR
+
+```
+1. On the base branch:  constrictor scan . -o graph-base.json
+2. On the PR branch:    constrictor scan . -o graph-pr.json
+3. Diff the two JSON files to see what edges and nodes changed.
+   - New CALLS edges indicate new dependencies.
+   - Removed nodes indicate deleted or renamed symbols.
+   - New CROSSES_COMPONENT_BOUNDARY edges are a red flag.
+```
+
+### Tracing data flow from API to database
+
+```
+1. constrictor scan . -o graph.json
+2. constrictor paths --from "POST /orders" --to "orders" --graph graph.json
+3. The output shows every hop: endpoint -> handler -> service -> model -> table.
+   Use this to verify that no unexpected intermediate modules are in the path.
+```
+
+### Auditing unresolved dependencies
+
+```
+1. constrictor scan . -o graph.json
+2. constrictor audit --graph graph.json
+3. For each unresolved edge, investigate whether it is:
+   - A dynamic import that cannot be statically resolved.
+   - A missing dependency that should be added to requirements.
+   - A cross-service call that should be documented.
+```
+
+### Cross-service impact analysis
+
+```
+1. constrictor scan . -o graph.json
+2. constrictor impact --node "<target>" --graph graph.json
+3. Look for CROSSES_COMPONENT_BOUNDARY edges in the output.
+   Each such edge indicates the change propagates across a service boundary.
+4. Use constrictor paths to confirm the exact routes that cross boundaries.
+```
+
+---
+
+## Reading the Output
+
+### JSON schema overview
+
+The graph JSON (`graph.json`) has this top-level structure:
+
+```json
+{
+  "nodes": [ ... ],
+  "edges": [ ... ],
+  "scan_metadata": { ... },
+  "warnings": [ ... ],
+  "unresolved": [ ... ],
+  "statistics": { ... }
+}
+```
+
+**Node fields:**
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `id` | string | Deterministic hash-based ID, e.g. `func:a1b2c3d4` |
+| `type` | string | `MODULE`, `CLASS`, `FUNCTION`, `METHOD`, `ENDPOINT`, `SERVICE`, etc. |
+| `name` | string | Short name, e.g. `greet` |
+| `qualified_name` | string | Fully-qualified name, e.g. `app.utils.greet` |
+| `display_name` | string | Human-readable, e.g. `app.utils::greet` |
+| `file_path` | string | Absolute path to the source file |
+| `line_number` | int \| null | Source line of the definition |
+| `certainty` | int | 0=UNRESOLVED, 1=AMBIGUOUS, 2=INFERRED, 3=EXACT |
+| `metadata` | object | Extra string key-value pairs (e.g. `http_method`, `path`) |
+
+**Edge fields:**
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `id` | string | Deterministic hash-based ID |
+| `source_id` | string | ID of the source node |
+| `target_id` | string | ID of the target node |
+| `type` | string | `IMPORTS`, `CALLS`, `INHERITS`, `EXPOSES_ENDPOINT`, `FOREIGN_KEY`, etc. |
+| `display_name` | string | Human-readable description of the relationship |
+| `certainty` | int | Same scale as node certainty |
+
+### Certainty levels
+
+| Level | Value | Meaning |
+|-------|-------|---------|
+| `UNRESOLVED` | 0 | Target could not be identified. Dynamic or missing dependency. |
+| `AMBIGUOUS` | 1 | Multiple possible targets; tool made a best guess. Needs review. |
+| `INFERRED` | 2 | Target inferred from context (e.g. import path). Likely correct. |
+| `EXACT` | 3 | Statically resolved with full confidence. |
+
+**Rule of thumb:** trust `EXACT` and `INFERRED` edges for automated analysis.
+Always flag `UNRESOLVED` and `AMBIGUOUS` edges for human review before acting on them.
+
+### Special edge types
+
+| Type | Meaning |
+|------|---------|
+| `CROSSES_COMPONENT_BOUNDARY` | Edge crosses a service/component boundary. High-signal for cross-service coupling. |
+| `BELONGS_TO_SERVICE` | Links a module to its owning service. |
+| `INJECTS_DEPENDENCY` | FastAPI `Depends(...)` injection. |
+| `CALLS_HTTP` | Outbound HTTP call to an external service or endpoint. |
+| `FOREIGN_KEY` | SQLAlchemy or Django ForeignKey relationship between tables. |
+
+### Statistics block
+
+The `statistics` object gives a quick health check:
+
+```json
+{
+  "total_files": 42,
+  "parsed_files": 41,
+  "failed_files": 1,
+  "total_nodes": 312,
+  "total_edges": 487,
+  "module_count": 42,
+  "function_count": 98,
+  "class_count": 23,
+  "endpoint_count": 14,
+  "service_count": 3,
+  "cross_component_edge_count": 7
+}
+```
+
+---
+
+## Prompt Templates
+
+Copy these into your agent prompts as needed.
+
+### Pre-refactor blast-radius check
+
+```
+Run `constrictor impact --node {target} --graph graph.json`.
+Report all affected files and functions.
+If any AMBIGUOUS or UNRESOLVED edges are in the blast radius, flag them explicitly
+and do not proceed without human confirmation.
+```
+
+### Dependency audit
+
+```
+Run `constrictor scan . -o graph.json && constrictor audit --graph graph.json`.
+List all unresolved and ambiguous edges. For each, explain what information is
+missing and suggest how to resolve it (e.g. add a type annotation, replace a
+dynamic import with a static one, or document an external dependency).
+```
+
+### Cross-service impact check
+
+```
+Run `constrictor impact --node {target} --graph graph.json`.
+If the impact crosses service boundaries (CROSSES_COMPONENT_BOUNDARY edges),
+list each affected service and the specific modules within it.
+Do not make changes that cross service boundaries without explicit human approval.
+```
+
+### Data flow trace
+
+```
+Run `constrictor paths --from "{source}" --to "{target}" --graph graph.json`.
+List every path found. For each path, describe the chain of relationships and
+identify any AMBIGUOUS edges that introduce uncertainty into the trace.
+```
+
+### Full pre-change audit
+
+```
+Before making any changes to {target_file}:
+1. Run `constrictor scan . -o graph.json`
+2. Run `constrictor impact --node "{target_file}" --graph graph.json`
+3. Run `constrictor audit --graph graph.json`
+Report: (a) total number of affected nodes, (b) any cross-service impacts,
+(c) any ambiguous/unresolved edges in the blast radius.
+Summarize whether it is safe to proceed or if human review is required.
+```
+
+---
+
+## Operational Notes
+
+### Ignore files
+
+Constrictor reads `.constrictor_ignore` from the project root. Format mirrors
+`.gitignore`: glob patterns, `#` comments, blank lines. Default-excluded paths
+include `__pycache__`, `.venv`, `venv`, `node_modules`, `dist`, `build`, `*.egg-info`,
+`.git`, `.tox`, `.nox`, `.mypy_cache`, `.pytest_cache`, `.ruff_cache`.
+
+Add project-specific exclusions to `.constrictor_ignore` in the project root.
+
+### Known limitations
+
+- **Dynamic imports** (`importlib.import_module(...)`, `__import__(...)`) produce
+  `UNRESOLVED` edges. They cannot be statically analyzed.
+- **Star imports** (`from module import *`) do not resolve individual names.
+  Symbols imported via `*` will appear as unresolved calls.
+- **Conditional imports** (`if TYPE_CHECKING:`) are treated as normal imports.
+  This is intentional — type-checking imports still represent real dependencies.
+- **Runtime monkey-patching** is invisible to static analysis by design.
+- **Call resolution accuracy** depends on import analysis being complete.
+  If imports are unresolved, downstream call edges may be `INFERRED` instead
+  of `EXACT`.
+- **Framework detection** covers FastAPI, Flask, Django, and SQLAlchemy.
+  Other frameworks produce call and import edges but not endpoint/model nodes.
+
+### Certainty guidance for automated agents
+
+- **Safe to act on automatically:** edges with `certainty >= 2` (INFERRED or EXACT).
+- **Require human review:** edges with `certainty <= 1` (AMBIGUOUS or UNRESOLVED).
+- **Impact traversal:** by default includes all certainty levels. Pass
+  `--no-ambiguous` (if available) or filter the JSON output to exclude low-certainty
+  edges before computing automated impact scores.
+
+---
+
+## Cross-Agent Install Shape
+
+The SKILL.md file is designed to work with any agent runtime that supports
+skill discovery. Standard install locations:
+
+| Runtime | Location |
+|---------|----------|
+| Codex | `~/.codex/skills/constrictor/SKILL.md` |
+| Claude Code | `~/.claude/skills/constrictor/SKILL.md` |
+| GitHub Copilot | `~/.copilot/skills/constrictor/SKILL.md` |
+| OpenCode | `~/.config/opencode/skills/constrictor/SKILL.md` |
+| Cursor | `~/.cursor/skills/constrictor/SKILL.md` |
+
+To install automatically, run:
+
+```bash
+# After pip install constrictor:
+constrictor agent skill -o /tmp/SKILL.md
+bash scripts/install-agent-skill.sh
+```
+
+Or generate and place manually:
+
+```bash
+constrictor agent skill -o ~/.cursor/skills/constrictor/SKILL.md
+```
