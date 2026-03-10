@@ -24,8 +24,12 @@ Every edge has a **certainty level** (`EXACT`, `INFERRED`, `AMBIGUOUS`, `UNRESOL
 
 ## Installation
 
+> **Note:** Constrictor is not yet published to PyPI. Install from source until the first release.
+
 ```bash
-pip install constrictor
+git clone https://github.com/ameya1995/Constrictor.git
+cd Constrictor
+pip install -e .
 ```
 
 **Requirements:** Python ≥ 3.10
@@ -33,8 +37,14 @@ pip install constrictor
 **Optional extras:**
 
 ```bash
-pip install "constrictor[dev]"   # adds pytest, ruff, mypy
-pip install "constrictor[js]"    # adds JS/TS support via tree-sitter
+pip install -e ".[dev]"   # adds pytest, ruff, mypy
+pip install -e ".[js]"    # adds JS/TS support via tree-sitter
+```
+
+Once published to PyPI, installation will be:
+
+```bash
+pip install constrictor
 ```
 
 ---

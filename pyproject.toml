@@ -2,6 +2,23 @@
 name = "constrictor"
 version = "0.1.0"
 description = "Static dependency and blast-radius analyzer for Python codebases"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Ameya Munagekar", email = "ameyaabh@buffalo.edu" }
+]
+keywords = ["static-analysis", "dependency-graph", "blast-radius", "ast", "refactoring", "mcp", "ai-agents"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Quality Assurance",
+]
 requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2.0",
@@ -19,6 +36,11 @@ dependencies = [
 
 [project.scripts]
 constrictor = "constrictor.cli.main:app"
+
+[project.urls]
+Homepage = "https://github.com/ameya1995/Constrictor"
+Repository = "https://github.com/ameya1995/Constrictor"
+"Bug Tracker" = "https://github.com/ameya1995/Constrictor/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "pytest-cov", "ruff", "mypy"]
