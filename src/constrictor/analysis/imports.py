@@ -95,6 +95,92 @@ class ImportExtractor:
                         file_lookup, builder, warnings,
                     )
 
+            self._detect_dynamic_imports(module, source_id, source_fp, builder, warnings)
+
+    def _detect_dynamic_imports(
+        self,
+        module: ParsedModule,
+        source_id: str,
+        source_fp: str,
+        builder: GraphBuilder,
+        warnings: list[ScanWarning],
+    ) -> None:
+        """Detect importlib.import_module() and __import__() calls.
+
+        These cannot be statically resolved, but we still emit an UNRESOLVED
+        IMPORTS edge so that constrictor_audit surfaces them and agents know
+        the module performs runtime module loading.  Without this, the graph
+        silently omits any indication that dynamic imports exist.
+        """
+        # Collect all local names that refer to the `importlib` module.
+        importlib_aliases: set[str] = set()
+        for node in ast.walk(module.ast_tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name == "importlib":
+                        importlib_aliases.add(alias.asname or "importlib")
+
+        # Avoid duplicate edges for the same call site.
+        seen_lines: set[int] = set()
+
+        for node in ast.walk(module.ast_tree):
+            if not isinstance(node, ast.Call):
+                continue
+
+            func = node.func
+            pattern: str | None = None
+
+            # importlib.import_module(name)
+            if (
+                isinstance(func, ast.Attribute)
+                and func.attr == "import_module"
+                and isinstance(func.value, ast.Name)
+                and func.value.id in importlib_aliases
+            ):
+                pattern = "importlib.import_module"
+
+            # __import__(name)
+            elif isinstance(func, ast.Name) and func.id == "__import__":
+                pattern = "__import__"
+
+            if pattern is None or node.lineno in seen_lines:
+                continue
+            seen_lines.add(node.lineno)
+
+            # Create a placeholder node representing an unknown dynamic target.
+            target_qname = "<dynamic>::<unknown>"
+            target_id = create_id("extmod", target_qname)
+            builder.add_node(
+                id=target_id,
+                type=NodeType.EXTERNAL_MODULE,
+                name="<unknown>",
+                qualified_name=target_qname,
+                display_name="<dynamic import>",
+                certainty=Certainty.UNRESOLVED,
+            )
+            builder.add_edge(
+                source_id=source_id,
+                target_id=target_id,
+                type=EdgeType.IMPORTS,
+                display_name=f"{source_id} dynamically imports unknown module",
+                file_path=source_fp,
+                line_number=node.lineno,
+                certainty=Certainty.UNRESOLVED,
+                metadata={"dynamic": "true", "pattern": pattern},
+            )
+            warnings.append(
+                ScanWarning(
+                    code="DYNAMIC_IMPORT",
+                    message=(
+                        f"Dynamic import via {pattern}() at "
+                        f"{source_fp}:{node.lineno} — target module cannot be "
+                        "statically resolved."
+                    ),
+                    path=source_fp,
+                    certainty=Certainty.UNRESOLVED,
+                )
+            )
+
     def _handle_import(
         self,
         node: ast.Import,

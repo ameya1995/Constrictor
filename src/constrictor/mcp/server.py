@@ -34,14 +34,48 @@ logger = logging.getLogger(__name__)
 
 _SERVER_NAME = "constrictor"
 
+# Module-level engine cache: absolute path -> (mtime, engine).
+# This avoids deserializing graph.json on every tool call when the file hasn't
+# changed — especially valuable for ephemeral agent sessions that start the
+# MCP server once and issue many queries in a row.
+_engine_cache: dict[str, tuple[float, "GraphQueryEngine"]] = {}
+
 
 def _load_engine(graph_path: str) -> GraphQueryEngine:
-    """Load a GraphDocument from disk and return a query engine for it."""
-    path = Path(graph_path)
+    """Load (or return a cached) GraphQueryEngine for *graph_path*.
+
+    The engine is cached by absolute path and invalidated whenever the file's
+    mtime changes, so auto-rescan writes are picked up automatically without
+    incurring a full JSON deserialisation on every tool call.
+    """
+    path = Path(graph_path).resolve()
     if not path.exists():
         raise FileNotFoundError(f"Graph file not found: {graph_path}")
+    mtime = path.stat().st_mtime
+    key = str(path)
+    cached = _engine_cache.get(key)
+    if cached is not None and cached[0] == mtime:
+        logger.debug("Engine cache hit: %s", key)
+        return cached[1]
     document = load_json(path)
-    return GraphQueryEngine(document)
+    engine = GraphQueryEngine(document)
+    _engine_cache[key] = (mtime, engine)
+    logger.debug("Engine cache populated: %s", key)
+    return engine
+
+
+def _resolve_graph_path(graph_path: str) -> str | None:
+    """Resolve *graph_path* to an actual JSON file path.
+
+    If a directory is given, look for ``graph.json`` inside it.  Returns
+    ``None`` when neither the file nor a ``graph.json`` in the directory
+    exists.
+    """
+    p = Path(graph_path)
+    if p.is_dir():
+        candidate = p / "graph.json"
+        return str(candidate) if candidate.exists() else None
+    return str(p) if p.exists() else None
 
 
 def _error_text(message: str) -> list[types.TextContent]:
@@ -100,11 +134,18 @@ async def _dispatch(
         return await _tool_scan(args)
 
     # All other tools need a graph file.
-    graph_path = args.get("graph_path") or default_graph_path
-    if not graph_path:
+    raw_graph_path = args.get("graph_path") or default_graph_path
+    if not raw_graph_path:
         return _error_text(
             "graph_path is required. Either pass it as an argument or start the "
             "server with --graph <path>."
+        )
+
+    graph_path = _resolve_graph_path(raw_graph_path)
+    if graph_path is None:
+        return _error_text(
+            f"No graph file found at {raw_graph_path!r}. "
+            "Run 'constrictor scan <project> -o graph.json' first."
         )
 
     if auto_rescan and default_graph_path:

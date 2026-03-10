@@ -19,6 +19,10 @@ def _mod_id(module_name: str) -> str:
     return create_id("mod", module_name)
 
 
+def _decorator_id(qualified_name: str) -> str:
+    return create_id("deco", qualified_name)
+
+
 @dataclass
 class _FuncInfo:
     qualified_name: str
@@ -95,6 +99,100 @@ def _collect_functions(module: ParsedModule) -> list[_FuncInfo]:
 
     _visit_body(module.ast_tree.body, class_name=None, prefix=module.module_name)
     return funcs
+
+
+def _get_decorator_callable(decorator: ast.expr) -> ast.expr:
+    """Strip factory wrapper: @retry(3) → the `retry` node itself."""
+    if isinstance(decorator, ast.Call):
+        return decorator.func
+    return decorator
+
+
+def _resolve_decorator_name(
+    decorator: ast.expr,
+    scope: _ModuleScope,
+) -> tuple[str, str, Certainty]:
+    """Return (qualified_name, display_name, certainty) for a decorator expression."""
+    node = _get_decorator_callable(decorator)
+
+    if isinstance(node, ast.Name):
+        name = node.id
+        # from functools import cache → functools::cache
+        if name in scope.from_imports:
+            mod, orig = scope.from_imports[name]
+            if mod:
+                return f"{mod}::{orig}", orig, Certainty.INFERRED
+        # Local definition (e.g. a decorator defined in the same module)
+        if name in scope.local_defs:
+            return scope.local_defs[name], name, Certainty.EXACT
+        return f"<unresolved>::{name}", name, Certainty.AMBIGUOUS
+
+    elif isinstance(node, ast.Attribute):
+        # Build dotted name: app.route → ["app", "route"]
+        parts: list[str] = []
+        cur: ast.expr = node
+        while isinstance(cur, ast.Attribute):
+            parts.append(cur.attr)
+            cur = cur.value
+        if isinstance(cur, ast.Name):
+            parts.append(cur.id)
+        parts.reverse()
+        obj_name = parts[0]
+        if obj_name in scope.import_aliases:
+            mod = scope.import_aliases[obj_name]
+            rest = "::".join(parts[1:])
+            return f"{mod}::{rest}", parts[-1], Certainty.INFERRED
+        attr_path = "::".join(parts)
+        return attr_path, parts[-1], Certainty.AMBIGUOUS
+
+    return "<dynamic>", "<dynamic>", Certainty.AMBIGUOUS
+
+
+def _process_decorators(
+    stmt: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
+    decorated_id: str,
+    file_path: str,
+    scope: _ModuleScope,
+    builder: GraphBuilder,
+) -> None:
+    """Emit DECORATOR nodes and DECORATES edges for every decorator on *stmt*.
+
+    This gives agents visibility into cross-cutting concerns (caching, auth,
+    retry, logging, etc.) that rewrite call graphs without being captured by
+    the framework-specific extractors.
+    """
+    for decorator in stmt.decorator_list:
+        is_factory = isinstance(decorator, ast.Call)
+        qname, display_name, certainty = _resolve_decorator_name(decorator, scope)
+
+        deco_id = _decorator_id(qname)
+        builder.add_node(
+            id=deco_id,
+            type=NodeType.DECORATOR,
+            name=display_name,
+            qualified_name=qname,
+            display_name=qname,
+            certainty=certainty,
+        )
+
+        meta: dict[str, str] = {}
+        if is_factory:
+            meta["is_factory"] = "true"
+        # functools.wraps preserves the original function identity — flag it
+        # so agents know the wrapper doesn't change the observable interface.
+        if qname in ("functools::wraps", "<unresolved>::wraps"):
+            meta["preserves_identity"] = "true"
+
+        builder.add_edge(
+            source_id=deco_id,
+            target_id=decorated_id,
+            type=EdgeType.DECORATES,
+            display_name=f"{qname} decorates {decorated_id}",
+            file_path=file_path,
+            line_number=stmt.lineno,
+            certainty=certainty,
+            metadata=meta,
+        )
 
 
 def _resolve_call_target(
@@ -265,6 +363,7 @@ class CallGraphExtractor:
                     certainty=Certainty.EXACT,
                 )
 
+                _process_decorators(stmt, func_id, mod_fp, scope, builder)
                 _walk_calls_in_func(
                     stmt, func_id, mod_fp, scope, enclosing_class, all_modules, builder
                 )
@@ -310,6 +409,8 @@ class CallGraphExtractor:
                     line_number=stmt.lineno,
                     certainty=Certainty.EXACT,
                 )
+
+                _process_decorators(stmt, cls_id, mod_fp, scope, builder)
 
                 # Recurse into class body for methods
                 self._process_body(
