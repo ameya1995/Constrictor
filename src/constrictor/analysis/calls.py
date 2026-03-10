@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from constrictor.core.models import Certainty, ScanWarning
@@ -325,7 +326,7 @@ class CallGraphExtractor:
 
     def _process_body(
         self,
-        stmts: list[ast.stmt],
+        stmts: Sequence[ast.stmt],
         parent_id: str,
         module: ParsedModule,
         scope: _ModuleScope,

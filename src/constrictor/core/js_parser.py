@@ -89,7 +89,7 @@ def parse_js_file(file_path: Path, root_path: Path) -> ParsedJSModule | None:
     try:
         from tree_sitter import Parser  # type: ignore[import]
 
-        parser = Parser(lang)
+        parser = Parser(lang)  # type: ignore[call-overload]
         tree = parser.parse(source)
     except Exception:
         return None

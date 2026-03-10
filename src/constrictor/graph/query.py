@@ -3,7 +3,7 @@ from __future__ import annotations
 import fnmatch
 import re
 from collections import deque
-from typing import Literal
+from typing import Any, Literal
 
 import networkx as nx
 
@@ -366,7 +366,7 @@ class GraphQueryEngine:
 
         for node in sorted(file_nodes, key=lambda n: n.line_number or 0):
             nt = node.type.value
-            entry = {
+            entry: dict[str, Any] = {
                 "name": node.display_name,
                 "qualified_name": node.qualified_name,
                 "line": node.line_number,
