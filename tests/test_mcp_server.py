@@ -45,7 +45,7 @@ def graph_file(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 def test_tool_definitions_count() -> None:
     tools = get_tool_definitions()
-    assert len(tools) == 6
+    assert len(tools) == 12
 
 
 def test_tool_names() -> None:
@@ -57,6 +57,12 @@ def test_tool_names() -> None:
         "constrictor_audit",
         "constrictor_dependents",
         "constrictor_summary",
+        "constrictor_search",
+        "constrictor_file_context",
+        "constrictor_diff_impact",
+        "constrictor_unused",
+        "constrictor_batch_impact",
+        "constrictor_cycles",
     }
     assert names == expected
 

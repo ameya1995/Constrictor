@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Optional
 
@@ -7,6 +8,7 @@ import typer
 from rich.console import Console
 from rich.tree import Tree
 
+from constrictor.export.format_output import validate_format
 from constrictor.export.json_export import load_json
 from constrictor.graph.query import GraphQueryEngine, NodeNotFoundError
 
@@ -47,12 +49,38 @@ def impact(
         "--no-ambiguous",
         help="Exclude AMBIGUOUS and UNRESOLVED edges from traversal.",
     ),
+    fmt: str = typer.Option(
+        "full",
+        "--format",
+        help="Output format: 'full' (default), 'compact' (token-efficient), or 'files' (file paths only).",
+    ),
+    edge_types: Optional[list[str]] = typer.Option(
+        None,
+        "--edge-type",
+        help="Only traverse edges of these types (e.g. CALLS). Repeatable.",
+    ),
+    node_types: Optional[list[str]] = typer.Option(
+        None,
+        "--node-type",
+        help="Only include result nodes of these types. Repeatable.",
+    ),
+    file_pattern: Optional[str] = typer.Option(
+        None,
+        "--file-pattern",
+        help="fnmatch glob to filter result nodes by file path.",
+    ),
 ) -> None:
     """Show the blast radius of a node -- what it affects or what depends on it."""
     if direction not in ("downstream", "upstream"):
         err_console.print(
             "[red]Error:[/red] --direction must be 'downstream' or 'upstream'."
         )
+        raise typer.Exit(code=2)
+
+    try:
+        validate_format(fmt)
+    except ValueError as exc:
+        err_console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(code=2)
 
     document = load_json(graph)
@@ -64,6 +92,9 @@ def impact(
             direction=direction,  # type: ignore[arg-type]
             max_depth=depth,
             include_ambiguous=not no_ambiguous,
+            edge_types=list(edge_types) if edge_types else None,
+            node_types=list(node_types) if node_types else None,
+            file_pattern=file_pattern,
         )
     except NodeNotFoundError as exc:
         err_console.print(f"[red]Error:[/red] {exc}")
@@ -72,6 +103,22 @@ def impact(
     focus = subgraph.focus_node
     affected_nodes = subgraph.nodes
     affected_edges = subgraph.edges
+
+    if fmt == "files":
+        all_nodes = [focus, *affected_nodes]
+        files = sorted({n.file_path for n in all_nodes if n.file_path})
+        console.print(json.dumps(files, indent=2))
+        return
+
+    if fmt == "compact":
+        rows = []
+        for n in affected_nodes:
+            loc = n.file_path or ""
+            if n.line_number is not None:
+                loc = f"{loc}:{n.line_number}"
+            rows.append({"qualified_name": n.qualified_name, "type": n.type.value, "location": loc})
+        console.print(json.dumps({"focus": focus.qualified_name, "nodes": rows}, indent=2))
+        return
 
     dir_label = "downstream" if direction == "downstream" else "upstream"
     title = (

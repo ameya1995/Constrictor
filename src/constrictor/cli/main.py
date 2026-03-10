@@ -8,9 +8,14 @@ from rich.console import Console
 from rich.table import Table
 
 from constrictor import __version__
+from constrictor.cli.context import context
+from constrictor.cli.cycles import cycles
+from constrictor.cli.diff_impact import diff_impact
 from constrictor.cli.impact import impact
 from constrictor.cli.paths import paths
+from constrictor.cli.search import search
 from constrictor.cli.serve import serve
+from constrictor.cli.unused import unused
 from constrictor.cli.watch import watch
 from constrictor.core.ignore import load_ignore_patterns
 from constrictor.core.models import ScanOptions
@@ -30,6 +35,11 @@ app.command("impact")(impact)
 app.command("paths")(paths)
 app.command("watch")(watch)
 app.command("serve")(serve)
+app.command("search")(search)
+app.command("context")(context)
+app.command("diff-impact")(diff_impact)
+app.command("unused")(unused)
+app.command("cycles")(cycles)
 
 # ── Export sub-app ────────────────────────────────────────────────────────
 export_app = typer.Typer(
@@ -205,12 +215,18 @@ def mcp_serve(
 
     \b
     Available tools:
-      constrictor_scan       -- scan a project and build the graph
-      constrictor_impact     -- blast-radius analysis (downstream / upstream)
-      constrictor_paths      -- enumerate dependency paths between two nodes
-      constrictor_audit      -- list ambiguous / unresolved edges
-      constrictor_dependents -- find all dependents of a file
-      constrictor_summary    -- human-readable graph summary + statistics
+      constrictor_scan         -- scan a project and build the graph
+      constrictor_impact       -- blast-radius analysis (downstream / upstream)
+      constrictor_paths        -- enumerate dependency paths between two nodes
+      constrictor_audit        -- list ambiguous / unresolved edges
+      constrictor_dependents   -- find all dependents of a file
+      constrictor_summary      -- human-readable graph summary + statistics
+      constrictor_search       -- search nodes by name, type, or file pattern
+      constrictor_file_context -- all entities defined in a single file
+      constrictor_diff_impact  -- blast radius from a git diff or line ranges
+      constrictor_unused       -- find dead code candidates (no incoming edges)
+      constrictor_batch_impact -- merged impact analysis for multiple nodes
+      constrictor_cycles       -- detect circular import dependencies
 
     \b
     Examples:

@@ -24,6 +24,7 @@ from mcp.server.stdio import stdio_server
 from constrictor import __version__
 from constrictor.core.models import ScanOptions
 from constrictor.core.orchestrator import run_scan
+from constrictor.export.format_output import format_nodes, format_subgraph, validate_format
 from constrictor.export.json_export import export_json, load_json
 from constrictor.export.summary import generate_summary
 from constrictor.graph.query import GraphQueryEngine, NodeNotFoundError
@@ -120,6 +121,18 @@ async def _dispatch(
         return await _tool_dependents(args, graph_path)
     if name == "constrictor_summary":
         return await _tool_summary(graph_path)
+    if name == "constrictor_search":
+        return await _tool_search(args, graph_path)
+    if name == "constrictor_file_context":
+        return await _tool_file_context(args, graph_path)
+    if name == "constrictor_diff_impact":
+        return await _tool_diff_impact(args, graph_path)
+    if name == "constrictor_unused":
+        return await _tool_unused(args, graph_path)
+    if name == "constrictor_batch_impact":
+        return await _tool_batch_impact(args, graph_path)
+    if name == "constrictor_cycles":
+        return await _tool_cycles(args, graph_path)
 
     return _error_text(f"Unknown tool: {name}")
 
@@ -182,6 +195,14 @@ async def _tool_impact(args: dict[str, Any], graph_path: str) -> list[types.Text
     direction = args.get("direction", "downstream")
     max_depth = int(args.get("max_depth", 6))
     include_ambiguous = bool(args.get("include_ambiguous", True))
+    fmt = args.get("format", "full")
+    edge_types: list[str] | None = args.get("edge_types")
+    node_types: list[str] | None = args.get("node_types")
+    file_pattern: str | None = args.get("file_pattern")
+    try:
+        fmt = validate_format(fmt)
+    except ValueError as exc:
+        return _error_text(str(exc))
 
     try:
         engine = _load_engine(graph_path)
@@ -190,17 +211,14 @@ async def _tool_impact(args: dict[str, Any], graph_path: str) -> list[types.Text
             direction=direction,  # type: ignore[arg-type]
             max_depth=max_depth,
             include_ambiguous=include_ambiguous,
+            edge_types=edge_types,
+            node_types=node_types,
+            file_pattern=file_pattern,
         )
     except (FileNotFoundError, NodeNotFoundError) as exc:
         return _error_text(str(exc))
 
-    result = {
-        "focus_node": subgraph.focus_node.model_dump(),
-        "affected_node_count": len(subgraph.nodes),
-        "affected_edge_count": len(subgraph.edges),
-        "nodes": [n.model_dump() for n in subgraph.nodes],
-        "edges": [e.model_dump() for e in subgraph.edges],
-    }
+    result = format_subgraph(subgraph.focus_node, subgraph.nodes, subgraph.edges, fmt=fmt)
     return _json_text(result)
 
 
@@ -211,26 +229,65 @@ async def _tool_paths(args: dict[str, Any], graph_path: str) -> list[types.TextC
         return _error_text("from_node and to_node are required for constrictor_paths.")
 
     max_depth = int(args.get("max_depth", 8))
+    fmt = args.get("format", "full")
+    path_edge_types: list[str] | None = args.get("edge_types")
+    path_node_types: list[str] | None = args.get("node_types")
+    try:
+        fmt = validate_format(fmt)
+    except ValueError as exc:
+        return _error_text(str(exc))
 
     try:
         engine = _load_engine(graph_path)
-        path_result = engine.find_paths(from_node, to_node, max_depth=max_depth)
+        path_result = engine.find_paths(
+            from_node,
+            to_node,
+            max_depth=max_depth,
+            edge_types=path_edge_types,
+            node_types=path_node_types,
+        )
     except (FileNotFoundError, NodeNotFoundError) as exc:
         return _error_text(str(exc))
 
-    result = {
-        "from_node": path_result.from_node.model_dump(),
-        "to_node": path_result.to_node.model_dump(),
-        "path_count": len(path_result.paths),
-        "paths": [
-            {
-                "hop_count": len(p.edges),
-                "nodes": [n.model_dump() for n in p.nodes],
-                "edges": [e.model_dump() for e in p.edges],
-            }
-            for p in path_result.paths
-        ],
-    }
+    if fmt == "files":
+        all_nodes = [path_result.from_node, path_result.to_node]
+        for p in path_result.paths:
+            all_nodes.extend(p.nodes)
+        files = sorted({n.file_path for n in all_nodes if n.file_path})
+        result: Any = {
+            "from_node": path_result.from_node.qualified_name,
+            "to_node": path_result.to_node.qualified_name,
+            "path_count": len(path_result.paths),
+            "files_touched": files,
+        }
+    elif fmt == "compact":
+        result = {
+            "from_node": path_result.from_node.qualified_name,
+            "to_node": path_result.to_node.qualified_name,
+            "path_count": len(path_result.paths),
+            "paths": [
+                {
+                    "hop_count": len(p.edges),
+                    "nodes": [n.qualified_name for n in p.nodes],
+                    "edge_types": [e.type.value for e in p.edges],
+                }
+                for p in path_result.paths
+            ],
+        }
+    else:
+        result = {
+            "from_node": path_result.from_node.model_dump(),
+            "to_node": path_result.to_node.model_dump(),
+            "path_count": len(path_result.paths),
+            "paths": [
+                {
+                    "hop_count": len(p.edges),
+                    "nodes": [n.model_dump() for n in p.nodes],
+                    "edges": [e.model_dump() for e in p.edges],
+                }
+                for p in path_result.paths
+            ],
+        }
     return _json_text(result)
 
 
@@ -255,16 +312,22 @@ async def _tool_dependents(args: dict[str, Any], graph_path: str) -> list[types.
     if not file_path:
         return _error_text("file_path is required for constrictor_dependents.")
 
+    fmt = args.get("format", "full")
+    try:
+        fmt = validate_format(fmt)
+    except ValueError as exc:
+        return _error_text(str(exc))
+
     try:
         engine = _load_engine(graph_path)
     except FileNotFoundError as exc:
         return _error_text(str(exc))
     dependent_nodes = engine.dependents(file_path)
 
-    result = {
+    result: Any = {
         "file_path": file_path,
         "dependent_count": len(dependent_nodes),
-        "dependents": [n.model_dump() for n in dependent_nodes],
+        "dependents": format_nodes(dependent_nodes, fmt=fmt),
     }
     return _json_text(result)
 
@@ -282,6 +345,190 @@ async def _tool_summary(graph_path: str) -> list[types.TextContent]:
         "summary": generate_summary(document),
         "statistics": stats.model_dump() if stats else {},
         "metadata": meta.model_dump(mode="json") if meta else {},
+    }
+    return _json_text(result)
+
+
+async def _tool_search(args: dict[str, Any], graph_path: str) -> list[types.TextContent]:
+    query = args.get("query")
+    if not query:
+        return _error_text("query is required for constrictor_search.")
+
+    node_types: list[str] | None = args.get("node_types")
+    file_pattern: str | None = args.get("file_pattern")
+    limit = int(args.get("limit", 10))
+
+    try:
+        engine = _load_engine(graph_path)
+    except FileNotFoundError as exc:
+        return _error_text(str(exc))
+
+    nodes = engine.search(query, node_types=node_types, file_pattern=file_pattern, limit=limit)
+
+    result = {
+        "query": query,
+        "result_count": len(nodes),
+        "results": [
+            {
+                "qualified_name": n.qualified_name,
+                "display_name": n.display_name,
+                "type": n.type.value,
+                "file_path": n.file_path,
+                "line_number": n.line_number,
+                "id": n.id,
+            }
+            for n in nodes
+        ],
+    }
+    return _json_text(result)
+
+
+async def _tool_file_context(args: dict[str, Any], graph_path: str) -> list[types.TextContent]:
+    file_path = args.get("file_path")
+    if not file_path:
+        return _error_text("file_path is required for constrictor_file_context.")
+
+    try:
+        engine = _load_engine(graph_path)
+    except FileNotFoundError as exc:
+        return _error_text(str(exc))
+
+    ctx = engine.file_context(file_path)
+    return _json_text(ctx)
+
+
+async def _tool_diff_impact(args: dict[str, Any], graph_path: str) -> list[types.TextContent]:
+    diff_text: str | None = args.get("diff")
+    changes: list[dict[str, Any]] | None = args.get("changes")
+    fmt = args.get("format", "compact")
+    try:
+        fmt = validate_format(fmt)
+    except ValueError as exc:
+        return _error_text(str(exc))
+
+    if not diff_text and not changes:
+        return _error_text("Either 'diff' (unified diff string) or 'changes' (list of {file_path, line_start, line_end}) is required.")
+
+    try:
+        engine = _load_engine(graph_path)
+    except FileNotFoundError as exc:
+        return _error_text(str(exc))
+
+    from constrictor.analysis.diff import parse_diff, ChangedRegion
+
+    if diff_text:
+        regions = parse_diff(diff_text)
+    else:
+        regions = [
+            ChangedRegion(
+                file_path=c["file_path"],
+                line_start=c.get("line_start", 1),
+                line_end=c.get("line_end", 99999),
+            )
+            for c in (changes or [])
+        ]
+
+    result = engine.diff_impact(regions, fmt=fmt)
+    return _json_text(result)
+
+
+async def _tool_unused(args: dict[str, Any], graph_path: str) -> list[types.TextContent]:
+    node_types: list[str] | None = args.get("node_types")
+    exclude_patterns: list[str] | None = args.get("exclude_patterns")
+    entry_points: list[str] | None = args.get("entry_points")
+
+    try:
+        engine = _load_engine(graph_path)
+    except FileNotFoundError as exc:
+        return _error_text(str(exc))
+
+    unused = engine.find_unused(
+        node_types=node_types,
+        exclude_patterns=exclude_patterns,
+        entry_points=entry_points,
+    )
+
+    # Group by file for readability
+    by_file: dict[str, list[dict[str, Any]]] = {}
+    for n in unused:
+        fp = n.file_path or "<unknown>"
+        by_file.setdefault(fp, []).append(
+            {"name": n.display_name, "qualified_name": n.qualified_name, "type": n.type.value, "line": n.line_number}
+        )
+
+    result = {
+        "unused_count": len(unused),
+        "by_file": {fp: sorted(items, key=lambda x: x.get("line") or 0) for fp, items in sorted(by_file.items())},
+    }
+    return _json_text(result)
+
+
+async def _tool_batch_impact(args: dict[str, Any], graph_path: str) -> list[types.TextContent]:
+    nodes_input: list[str] | None = args.get("nodes")
+    if not nodes_input:
+        return _error_text("nodes (list of node identifiers) is required for constrictor_batch_impact.")
+
+    direction = args.get("direction", "downstream")
+    max_depth = int(args.get("max_depth", 6))
+    fmt = args.get("format", "compact")
+    try:
+        fmt = validate_format(fmt)
+    except ValueError as exc:
+        return _error_text(str(exc))
+
+    try:
+        engine = _load_engine(graph_path)
+    except FileNotFoundError as exc:
+        return _error_text(str(exc))
+
+    try:
+        subgraph = engine.batch_impact(
+            nodes_input,
+            direction=direction,  # type: ignore[arg-type]
+            max_depth=max_depth,
+        )
+    except Exception as exc:
+        return _error_text(str(exc))
+
+    from constrictor.export.format_output import format_nodes, format_edges
+
+    if fmt == "files":
+        files = sorted({n.file_path for n in subgraph["nodes"] if n.file_path})
+        result: Any = {
+            "input_nodes": subgraph["focus_nodes"],
+            "affected_file_count": len(files),
+            "affected_files": files,
+        }
+    elif fmt == "compact":
+        result = {
+            "input_nodes": subgraph["focus_nodes"],
+            "affected_node_count": len(subgraph["nodes"]),
+            "nodes": format_nodes(subgraph["nodes"], fmt="compact"),
+        }
+    else:
+        result = {
+            "input_nodes": subgraph["focus_nodes"],
+            "affected_node_count": len(subgraph["nodes"]),
+            "affected_edge_count": len(subgraph["edges"]),
+            "nodes": [n.model_dump() for n in subgraph["nodes"]],
+            "edges": [e.model_dump() for e in subgraph["edges"]],
+        }
+    return _json_text(result)
+
+
+async def _tool_cycles(args: dict[str, Any], graph_path: str) -> list[types.TextContent]:
+    edge_types: list[str] | None = args.get("edge_types")
+
+    try:
+        engine = _load_engine(graph_path)
+    except FileNotFoundError as exc:
+        return _error_text(str(exc))
+
+    cycles = engine.find_cycles(edge_types=edge_types)
+
+    result = {
+        "cycle_count": len(cycles),
+        "cycles": cycles,
     }
     return _json_text(result)
 
