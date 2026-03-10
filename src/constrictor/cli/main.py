@@ -319,6 +319,7 @@ def scan(
     options = ScanOptions(
         root_path=path,
         exclude_patterns=list(exclude) if exclude else [],
+        exclude_files=list(exclude_file) if exclude_file else [],
         include_js=include_js,
     )
 

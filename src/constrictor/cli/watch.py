@@ -43,6 +43,11 @@ def watch(
         "-e",
         help="Additional glob patterns to exclude.",
     ),
+    exclude_file: Optional[list[Path]] = typer.Option(
+        None,
+        "--exclude-file",
+        help="Path to a file containing additional exclude patterns.",
+    ),
     incremental: bool = typer.Option(
         True,
         "--incremental/--no-incremental",
@@ -71,6 +76,7 @@ def watch(
     options = ScanOptions(
         root_path=path,
         exclude_patterns=list(exclude) if exclude else [],
+        exclude_files=list(exclude_file) if exclude_file else [],
     )
 
     mode_label = "[cyan]incremental[/cyan]" if incremental else "[yellow]full[/yellow]"

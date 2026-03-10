@@ -24,6 +24,7 @@ class ScanOptions(BaseModel):
     root_path: Path
     max_depth: int = 64
     exclude_patterns: list[str] = []
+    exclude_files: list[Path] = []
     include_tests: bool = False
     include_js: bool = False
 

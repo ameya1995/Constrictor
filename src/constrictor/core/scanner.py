@@ -36,6 +36,7 @@ class ScanResult(BaseModel):
 def scan_directory(options: ScanOptions) -> ScanResult:
     patterns = load_ignore_patterns(
         options.root_path,
+        extra_exclude_files=options.exclude_files if options.exclude_files else None,
         extra_patterns=options.exclude_patterns if options.exclude_patterns else None,
     )
 
@@ -83,7 +84,7 @@ def scan_directory(options: ScanOptions) -> ScanResult:
         filtered_dirs: list[str] = []
         for d in dirnames:
             dir_path = dirpath / d
-            if should_exclude(dir_path, patterns):
+            if should_exclude(dir_path, patterns, root=root):
                 continue
             filtered_dirs.append(d)
         dirnames[:] = filtered_dirs
@@ -91,7 +92,7 @@ def scan_directory(options: ScanOptions) -> ScanResult:
         for filename in filenames:
             file_path = dirpath / filename
 
-            if should_exclude(file_path, patterns):
+            if should_exclude(file_path, patterns, root=root):
                 continue
 
             # Check for broken symlinks
