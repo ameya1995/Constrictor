@@ -49,6 +49,7 @@ Add to your agent config (e.g. `.claude/mcp.json`, `~/.cursor/mcp.json`):
 | `constrictor_cycles` | Detect circular import dependencies |
 | `constrictor_dependents` | Find all dependents of a file |
 | `constrictor_audit` | List ambiguous / unresolved edges |
+| `constrictor_rescan_graph` | Rebuild `graph.json` in place after editing code |
 | `constrictor_summary` | Human-readable graph summary + statistics |
 
 **SSE transport** (for HTTP-based agent runtimes):
@@ -91,6 +92,14 @@ constrictor unused --graph graph.json --exclude "tests/*"
 ```bash
 constrictor cycles --graph graph.json
 ```
+
+**After an agent edits files:**
+```bash
+# Ask the MCP server to rebuild graph.json in place
+constrictor mcp serve --graph graph.json
+```
+
+Then call `constrictor_rescan_graph` from the agent before running impact or path analysis again.
 
 ---
 
@@ -197,6 +206,68 @@ constrictor export neo4j /path/to/project -o ./neo4j/   # produces nodes.csv, ed
 constrictor serve --graph graph.json --port 8080
 ```
 Interactive force-directed D3.js graph visualization in the browser.
+
+### Web UI quick start
+
+```bash
+# 1. Build or refresh the graph
+constrictor scan . -o graph.json
+
+# 2. Start the browser UI
+constrictor serve --graph graph.json --port 8080
+
+# 3. Open the app
+open http://127.0.0.1:8080
+```
+
+### How to use the UI
+
+The web UI is organized as a three-column workspace:
+
+- **Left panel**: view selection, focus controls, filters, and path inspector
+- **Center panel**: interactive dependency graph or unresolved-audit list
+- **Right panel**: metadata and blast-radius details for the currently selected node
+
+**Recommended workflow:**
+
+1. Start in **Workspace topology** for a full-project view.
+2. Use **Node type** filters to remove noise before inspecting a subgraph.
+3. Type in **Focus** to visually narrow the graph to matching nodes.
+4. Click a node in the graph to open its metadata and impact analysis in the right panel.
+5. Switch **Downstream / Upstream** to answer either "what does this affect?" or "what depends on this?".
+6. Increase **Depth** when you want a broader blast radius.
+7. Use **Path Inspector** when you need concrete paths between two nodes.
+
+**Views:**
+
+- **Workspace topology**: the full graph, useful for general exploration
+- **Service/API dependencies**: emphasizes service, component, endpoint, and external-service nodes
+- **Data/table impact**: emphasizes SQLAlchemy models, tables, modules, and packages
+- **Unresolved audit**: shows ambiguous and unresolved edges in a readable review list
+
+**Controls:**
+
+- **Node type** filter: show or hide classes of nodes without rebuilding the graph on disk
+- **Edge type** filter: restrict the rendered graph to one edge type such as `CALLS` or `IMPORTS`
+- **Show ambiguous**: hide inferred/ambiguous edges when you want a cleaner exact-only visualization of the current graph
+- **Path Inspector**: enter a `from` node and `to` node, then click **Find paths**
+
+**Interpreting the graph:**
+
+- Larger nodes usually represent higher-level entities like services and components
+- Colored dashed hulls group nodes that belong to the same detected service/component boundary
+- Selecting a node highlights directly connected neighbors and dims unrelated parts of the graph
+- The top stat tiles are a quick orientation aid, not a replacement for detailed analysis
+
+**Keeping the UI fresh after code changes:**
+
+- If you are using the CLI directly, rerun `constrictor scan . -o graph.json`
+- If you are using the MCP server, call `constrictor_rescan_graph` after a batch of edits
+- If you want automatic refresh on file changes, use `constrictor watch . -o graph.json` in a separate terminal and reload the browser
+
+**Current note:**
+
+- The `Exact only` checkbox is present in the UI as a reserved control, but it is not wired to behavior yet. The working filter today is `Show ambiguous`.
 
 ---
 

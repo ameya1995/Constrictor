@@ -103,6 +103,28 @@ def create_app(document: GraphDocument) -> FastAPI:
             if n.type in (NodeType.SERVICE, NodeType.COMPONENT)
         ]
 
+    @app.get("/api/audit")
+    def api_audit() -> dict:
+        """Return AMBIGUOUS and UNRESOLVED edges enriched with source/target display names."""
+        review = engine.ambiguous_audit()
+        node_index = {n.id: n for n in document.nodes}
+
+        def enrich(e: GraphEdge) -> dict:
+            d = e.model_dump(mode="json")
+            src = node_index.get(e.source_id)
+            tgt = node_index.get(e.target_id)
+            d["source_name"] = src.display_name if src else e.source_id
+            d["source_file"] = src.file_path if src else None
+            d["target_name"] = tgt.display_name if tgt else e.target_id
+            d["target_file"] = tgt.file_path if tgt else None
+            return d
+
+        return {
+            "unresolved_count": len(review.unresolved_edges),
+            "ambiguous_count": len(review.ambiguous_edges),
+            "edges": [enrich(e) for e in review.unresolved_edges + review.ambiguous_edges],
+        }
+
     # ------------------------------------------------------------------
     # Static / UI
     # ------------------------------------------------------------------

@@ -3,60 +3,120 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Constrictor Graph Explorer</title>
+  <title>Constrictor · Dependency Explorer</title>
   <link rel="stylesheet" href="/static/app.css" />
-  <!-- D3.js via CDN -->
   <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 </head>
 <body>
 <div id="app">
-  <!-- Top Bar -->
+
+  <!-- ── Top bar ─────────────────────────────────────────────────── -->
   <header id="topbar">
-    <h1>⬡ Constrictor</h1>
-    <input
-      id="search-box"
-      type="search"
-      placeholder="Search nodes by name…"
-      autocomplete="off"
-    />
-    <div id="filter-bar"></div>
-    <div id="stats-bar">Loading…</div>
+    <div id="brand">
+      <span class="brand-hex">⬡</span>
+      <div>
+        <div class="brand-name">CONSTRICTOR</div>
+        <div class="brand-sub">DEPENDENCY EXPLORER</div>
+      </div>
+    </div>
+    <div id="stats-tiles"><!-- populated by JS --></div>
   </header>
 
-  <!-- Main area -->
-  <div id="main">
-    <!-- Graph canvas -->
-    <div id="graph-container">
-      <svg id="graph-svg">
-        <defs>
-          <marker id="arrowhead" markerWidth="8" markerHeight="6"
-                  refX="6" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="#3a4060" />
-          </marker>
-          <marker id="arrowhead-hl" markerWidth="8" markerHeight="6"
-                  refX="6" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="#7c6af5" />
-          </marker>
-        </defs>
-        <g id="zoom-group"></g>
-      </svg>
-    </div>
+  <!-- ── Body (left panel | graph | right panel) ─────────────────── -->
+  <div id="body">
 
-    <!-- Detail sidebar -->
-    <aside id="sidebar">
-      <div id="sidebar-empty">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>
-        </svg>
-        <span>Click a node to explore it</span>
+    <!-- Left panel -->
+    <aside id="left-panel">
+
+      <!-- Views -->
+      <div class="lp-section">
+        <div class="lp-label">Views</div>
+        <nav id="views-nav">
+          <button class="view-btn active" data-view="topology">Workspace topology</button>
+          <button class="view-btn" data-view="services">Service/API dependencies</button>
+          <button class="view-btn" data-view="data">Data/table impact</button>
+          <button class="view-btn" data-view="audit">Unresolved audit</button>
+        </nav>
       </div>
-      <div id="sidebar-content" style="display:none"></div>
+
+      <!-- Focus -->
+      <div class="lp-section">
+        <div class="lp-label">Focus</div>
+        <input id="focus-search" type="search" placeholder="endpoint, class, method…" autocomplete="off" />
+        <div id="dir-toggle">
+          <button class="dir-btn active" data-dir="downstream">Downstream</button>
+          <button class="dir-btn" data-dir="upstream">Upstream</button>
+        </div>
+        <div class="checkbox-row">
+          <label class="cb-label"><input type="checkbox" id="exact-only" /> Exact only</label>
+          <label class="cb-label"><input type="checkbox" id="show-ambiguous" checked /> Show ambiguous</label>
+        </div>
+        <div class="depth-row">
+          <span class="depth-label">Depth</span>
+          <input type="range" id="depth-slider" min="1" max="12" value="6" />
+          <span id="depth-val">6</span>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="lp-section">
+        <div class="lp-label">Filters</div>
+        <div class="filter-block">
+          <div class="filter-block-label">Node type</div>
+          <div class="filter-checklist" id="nodetype-list"><!-- JS --></div>
+        </div>
+        <div class="filter-block">
+          <div class="filter-block-label">Edge type</div>
+          <select id="edgetype-filter" size="4">
+            <option value="">All</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Path Inspector -->
+      <div class="lp-section">
+        <div class="lp-label">Path Inspector</div>
+        <input id="path-from" type="text" placeholder="from node" autocomplete="off" />
+        <input id="path-to"   type="text" placeholder="to node"   autocomplete="off" />
+        <button id="find-paths-btn" class="btn-accent">Find paths</button>
+        <div id="path-results"></div>
+      </div>
+
     </aside>
-  </div>
-</div>
+
+    <!-- Main content (graph or audit list) -->
+    <main id="main-area">
+      <div id="graph-view">
+        <svg id="graph-svg">
+          <defs>
+            <marker id="arrowhead" markerWidth="8" markerHeight="6"
+                    refX="6" refY="3" orient="auto">
+              <polygon points="0 0, 8 3, 0 6" fill="#3a4060" />
+            </marker>
+            <marker id="arrowhead-hl" markerWidth="8" markerHeight="6"
+                    refX="6" refY="3" orient="auto">
+              <polygon points="0 0, 8 3, 0 6" fill="#7c6af5" />
+            </marker>
+          </defs>
+          <g id="zoom-group"></g>
+        </svg>
+      </div>
+      <div id="audit-view" style="display:none">
+        <div id="audit-content">Loading…</div>
+      </div>
+    </main>
+
+    <!-- Right panel: node metadata -->
+    <aside id="right-panel">
+      <div class="rp-header">Node Metadata</div>
+      <div id="rp-empty">Select a node to inspect metadata and blast radius context.</div>
+      <div id="rp-content" style="display:none"></div>
+    </aside>
+
+  </div><!-- /body -->
+</div><!-- /app -->
 
 <div id="tooltip"></div>
-
 <script src="/static/app.js"></script>
 </body>
 </html>
