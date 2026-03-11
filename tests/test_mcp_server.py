@@ -18,6 +18,7 @@ from constrictor.mcp.server import (
     _tool_dependents,
     _tool_impact,
     _tool_paths,
+    _tool_rescan_graph,
     _tool_scan,
     _tool_summary,
     create_server,
@@ -45,7 +46,7 @@ def graph_file(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 def test_tool_definitions_count() -> None:
     tools = get_tool_definitions()
-    assert len(tools) == 12
+    assert len(tools) == 13
 
 
 def test_tool_names() -> None:
@@ -63,6 +64,7 @@ def test_tool_names() -> None:
         "constrictor_unused",
         "constrictor_batch_impact",
         "constrictor_cycles",
+        "constrictor_rescan_graph",
     }
     assert names == expected
 
@@ -281,3 +283,38 @@ def test_error_text_format() -> None:
     result = _error_text("something went wrong")
     assert len(result) == 1
     assert result[0].text == "ERROR: something went wrong"
+
+
+# ── constrictor_rescan_graph ──────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_rescan_graph_basic(graph_file: Path) -> None:
+    result = await _tool_rescan_graph({}, str(graph_file))
+    assert len(result) == 1
+    data = json.loads(result[0].text)
+    assert data["status"] == "ok"
+    assert data["graph_written_to"] == str(graph_file)
+    assert data["statistics"]["total_nodes"] > 0
+    assert "elapsed_seconds" in data
+    assert graph_file.exists()
+
+
+@pytest.mark.asyncio
+async def test_rescan_graph_incremental_flag(graph_file: Path) -> None:
+    result = await _tool_rescan_graph({"incremental": False}, str(graph_file))
+    data = json.loads(result[0].text)
+    assert data["status"] == "ok"
+    assert data["statistics"]["total_nodes"] > 0
+
+
+@pytest.mark.asyncio
+async def test_rescan_graph_missing_graph() -> None:
+    result = await _tool_rescan_graph({}, "/no/such/graph.json")
+    assert result[0].text.startswith("ERROR:")
+
+
+@pytest.mark.asyncio
+async def test_rescan_graph_no_graph_path() -> None:
+    result = await _dispatch("constrictor_rescan_graph", {}, None, False)
+    assert result[0].text.startswith("ERROR:")

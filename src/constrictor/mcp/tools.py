@@ -487,4 +487,41 @@ def get_tool_definitions() -> list[types.Tool]:
                 "required": ["graph_path"],
             },
         ),
+        types.Tool(
+            name="constrictor_rescan_graph",
+            description=(
+                "Re-scan the project and rebuild graph.json in place. "
+                "Call this after editing files to ensure the dependency graph is "
+                "up-to-date before running impact analysis or other queries. "
+                "The project root is recovered automatically from the graph's scan "
+                "metadata, so no extra arguments are required beyond the graph path."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "graph_path": {
+                        "type": "string",
+                        "description": (
+                            "Path to the graph.json file to rebuild. "
+                            "If omitted the server's default --graph path is used."
+                        ),
+                    },
+                    "incremental": {
+                        "type": "boolean",
+                        "description": (
+                            "Use incremental caching -- only re-analyse files that "
+                            "changed since the last scan. Defaults to true for speed; "
+                            "set to false to force a full rebuild."
+                        ),
+                        "default": True,
+                    },
+                    "exclude_patterns": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Additional glob patterns to exclude from the scan.",
+                    },
+                },
+                "required": [],
+            },
+        ),
     ]

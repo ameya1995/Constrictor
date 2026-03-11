@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from pathlib import Path
 from typing import Any
 
@@ -174,6 +175,8 @@ async def _dispatch(
         return await _tool_batch_impact(args, graph_path)
     if name == "constrictor_cycles":
         return await _tool_cycles(args, graph_path)
+    if name == "constrictor_rescan_graph":
+        return await _tool_rescan_graph(args, graph_path)
 
     return _error_text(f"Unknown tool: {name}")
 
@@ -573,6 +576,58 @@ async def _tool_cycles(args: dict[str, Any], graph_path: str) -> list[types.Text
     result = {
         "cycle_count": len(cycles),
         "cycles": cycles,
+    }
+    return _json_text(result)
+
+
+async def _tool_rescan_graph(args: dict[str, Any], graph_path: str) -> list[types.TextContent]:
+    """Re-scan the project and overwrite graph.json in place.
+
+    The project root is recovered from ``scan_metadata.root_path`` inside the
+    existing graph so the caller does not need to remember it.  Falls back to
+    the parent directory of *graph_path* when metadata is absent (e.g. the
+    file was written by an older version of Constrictor).
+    """
+    gp = Path(graph_path)
+    if not gp.exists():
+        return _error_text(
+            f"Graph file not found: {graph_path}. "
+            "Run 'constrictor scan <project> -o graph.json' first."
+        )
+
+    # Recover the original project root from the graph's own metadata.
+    try:
+        existing = load_json(gp)
+        if existing.scan_metadata and existing.scan_metadata.root_path:
+            project_root = Path(existing.scan_metadata.root_path)
+        else:
+            project_root = gp.parent
+    except Exception:  # noqa: BLE001
+        project_root = gp.parent
+
+    if not project_root.exists():
+        return _error_text(
+            f"Project root does not exist: {project_root}. "
+            "The graph may have been created on a different machine."
+        )
+
+    incremental: bool = args.get("incremental", True)
+    exclude_patterns: list[str] = args.get("exclude_patterns") or []
+
+    options = ScanOptions(root_path=project_root, exclude_patterns=exclude_patterns)
+    t0 = time.monotonic()
+    document = run_scan(options, incremental=incremental)
+    elapsed = round(time.monotonic() - t0, 3)
+    export_json(document, gp)
+
+    stats = document.statistics
+    result: dict[str, Any] = {
+        "status": "ok",
+        "project_root": str(project_root),
+        "graph_written_to": str(gp),
+        "elapsed_seconds": elapsed,
+        "statistics": stats.model_dump() if stats else {},
+        "warning_count": len(document.warnings) + len(document.unresolved),
     }
     return _json_text(result)
 
