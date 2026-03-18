@@ -188,11 +188,20 @@ constrictor agent skill -o SKILL.md
 4. Proceed with the refactor knowing which files and functions will be impacted.
 ```
 
+**With staleness check (recommended for agents):**
+
+```
+1. constrictor_check_staleness --graph graph.json
+2. If is_stale=true: constrictor_rescan_graph --graph graph.json
+3. constrictor_impact --node "<target>" --graph graph.json
+4. Proceed with refactor based on accurate blast radius.
+```
+
 ### Before reviewing a PR
 
 ```
-1. On the base branch:  constrictor scan . -o graph-base.json
-2. On the PR branch:    constrictor scan . -o graph-pr.json
+1. On the base branch: constrictor scan . -o graph-base.json
+2. On the PR branch: constrictor scan . -o graph-pr.json
 3. Diff the two JSON files to see what edges and nodes changed.
    - New CALLS edges indicate new dependencies.
    - Removed nodes indicate deleted or renamed symbols.
@@ -206,6 +215,14 @@ constrictor agent skill -o SKILL.md
 2. constrictor paths --from "POST /orders" --to "orders" --graph graph.json
 3. The output shows every hop: endpoint -> handler -> service -> model -> table.
    Use this to verify that no unexpected intermediate modules are in the path.
+```
+
+**With staleness check:**
+
+```
+1. constrictor_check_staleness --graph graph.json
+2. If stale: constrictor_rescan_graph --graph graph.json
+3. constrictor_paths --from "POST /orders" --to "orders" --graph graph.json
 ```
 
 ### Auditing unresolved dependencies
@@ -368,6 +385,18 @@ Report: (a) total number of affected nodes, (b) any cross-service impacts,
 Summarize whether it is safe to proceed or if human review is required.
 ```
 
+### Staleness-aware impact analysis (recommended)
+
+```
+Before running impact analysis:
+1. Call `constrictor_check_staleness` with the graph path.
+2. If `is_stale` is true:
+   - Call `constrictor_rescan_graph` immediately.
+   - Wait for the rescan to complete.
+3. Only then call `constrictor_impact` or `constrictor_paths`.
+This ensures your analysis is based on current code state.
+```
+
 ---
 
 ## Operational Notes
@@ -392,17 +421,65 @@ Add project-specific exclusions to `.constrictor_ignore` in the project root.
 - **Runtime monkey-patching** is invisible to static analysis by design.
 - **Call resolution accuracy** depends on import analysis being complete.
   If imports are unresolved, downstream call edges may be `INFERRED` instead
-  of `EXACT`.
+of `EXACT`.
 - **Framework detection** covers FastAPI, Flask, Django, and SQLAlchemy.
-  Other frameworks produce call and import edges but not endpoint/model nodes.
+Other frameworks produce call and import edges but not endpoint/model nodes.
 
 ### Certainty guidance for automated agents
 
 - **Safe to act on automatically:** edges with `certainty >= 2` (INFERRED or EXACT).
 - **Require human review:** edges with `certainty <= 1` (AMBIGUOUS or UNRESOLVED).
 - **Impact traversal:** by default includes all certainty levels. Pass
-  `--no-ambiguous` (if available) or filter the JSON output to exclude low-certainty
-  edges before computing automated impact scores.
+`--no-ambiguous` (if available) or filter the JSON output to exclude low-certainty
+edges before computing automated impact scores.
+
+### Graph staleness detection
+
+The dependency graph goes stale when source files change after the last scan.
+Running impact analysis on a stale graph produces inaccurate results.
+
+**How to detect staleness:**
+
+1. Before any impact analysis, call `constrictor_check_staleness`:
+   ```json
+   { "graph_path": "graph.json" }
+   ```
+
+2. If `is_stale: true`, you MUST call `constrictor_rescan_graph` before proceeding:
+   ```json
+   { "graph_path": "graph.json", "incremental": true }
+   ```
+
+3. Only then run your impact or path queries.
+
+**Staleness indicators:**
+
+| Field | Meaning |
+|-------|---------|
+| `is_stale` | `true` if any file changed/added/removed since last scan |
+| `changed_file_count` | Files modified after graph creation |
+| `added_file_count` | New files not in the original scan |
+| `removed_file_count` | Files deleted since the original scan |
+| `seconds_since_scan` | Time elapsed since graph.json was written |
+| `recommendation` | Human-readable action guidance |
+
+**Mandatory staleness check pattern:**
+
+```
+Before running constrictor_impact or constrictor_paths:
+1. Call constrictor_check_staleness
+2. If is_stale=true:
+   - Call constrictor_rescan_graph
+   - Wait for completion
+3. Proceed with impact/path analysis
+```
+
+**Why this matters:**
+
+- A stale graph will not reflect new imports, function calls, or class hierarchies
+- Impact analysis on stale data will miss downstream dependents
+- Path tracing may fail to find routes through newly-added code
+- The agent may give incorrect refactoring advice based on outdated topology
 
 ---
 

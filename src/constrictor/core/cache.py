@@ -51,6 +51,7 @@ _CONFIG_NAMES = {
 # Public data classes
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class FileFragment:
     """Nodes and edges contributed by a single source file in a previous scan."""
@@ -96,6 +97,7 @@ class DiffResult:
 # Hash helpers
 # ---------------------------------------------------------------------------
 
+
 def hash_file(path: Path) -> str:
     """Return the SHA-256 hex digest of a file's contents."""
     h = hashlib.sha256()
@@ -111,6 +113,7 @@ def hash_file(path: Path) -> str:
 # ---------------------------------------------------------------------------
 # FileCache
 # ---------------------------------------------------------------------------
+
 
 class FileCache:
     """Persistent cache of per-file hashes and graph fragments."""
@@ -143,9 +146,7 @@ class FileCache:
     def save(self) -> None:
         """Persist the current hash table to disk."""
         self._cache_dir.mkdir(parents=True, exist_ok=True)
-        self._hashes_path.write_text(
-            json.dumps(self._hashes, sort_keys=True, indent=2), encoding="utf-8"
-        )
+        self._hashes_path.write_text(json.dumps(self._hashes, sort_keys=True, indent=2), encoding="utf-8")
 
     # ------------------------------------------------------------------ diff
 
@@ -154,9 +155,7 @@ class FileCache:
         if not self._loaded:
             self.load()
 
-        current_map: dict[str, str] = {
-            str(p.resolve()): hash_file(p) for p in current_files
-        }
+        current_map: dict[str, str] = {str(p.resolve()): hash_file(p) for p in current_files}
         prev_keys = set(self._hashes)
         curr_keys = set(current_map)
 
@@ -259,3 +258,159 @@ class FileCache:
         if not self._loaded:
             self.load()
         return len(self._hashes) == 0
+
+
+# ---------------------------------------------------------------------------
+# Staleness checking for agent workflows
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class StalenessResult:
+    """Result of checking whether a graph.json is stale relative to source files."""
+
+    is_stale: bool
+    """True if any source file changed since the graph was built."""
+
+    graph_path: str
+    """Path to the graph.json file that was checked."""
+
+    graph_mtime: float
+    """Modification timestamp of graph.json."""
+
+    changed_files: list[Path] = field(default_factory=list)
+    """Source files that changed after graph.json was created."""
+
+    added_files: list[Path] = field(default_factory=list)
+    """Source files added after graph.json was created."""
+
+    removed_files: list[Path] = field(default_factory=list)
+    """Source files removed after graph.json was created."""
+
+    total_scanned_files: int = 0
+    """Number of Python files found in the current scan."""
+
+    seconds_since_scan: float = 0.0
+    """Seconds elapsed since graph.json was last modified."""
+
+    recommendation: str = ""
+    """Human-readable recommendation for the agent."""
+
+
+def check_graph_staleness(
+    graph_path: Path,
+    project_root: Path,
+    exclude_patterns: list[str] | None = None,
+) -> StalenessResult:
+    """Check if graph.json is stale relative to the current source files.
+
+    This function compares the modification time of graph.json against all
+    Python files in the project. If any source file is newer than the graph,
+    the graph is considered stale and should be rebuilt.
+
+    Args:
+        graph_path: Path to graph.json
+        project_root: Root directory of the project
+        exclude_patterns: Optional glob patterns for files to exclude
+
+    Returns:
+        StalenessResult with details about what changed and a recommendation.
+    """
+    from fnmatch import fnmatch
+    import time
+
+    if not graph_path.exists():
+        return StalenessResult(
+            is_stale=True,
+            graph_path=str(graph_path),
+            graph_mtime=0.0,
+            changed_files=[],
+            added_files=[],
+            removed_files=[],
+            recommendation=(f"Graph file not found at {graph_path}. Run 'constrictor scan' to create it."),
+        )
+
+    graph_mtime = graph_path.stat().st_mtime
+    now = time.time()
+    seconds_since = now - graph_mtime
+
+    exclude_patterns = exclude_patterns or []
+    default_excludes = {
+        "__pycache__",
+        ".git",
+        ".venv",
+        "venv",
+        "node_modules",
+        "dist",
+        "build",
+        "*.egg-info",
+        ".tox",
+        ".nox",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".constrictor_cache",
+    }
+    all_excludes = default_excludes.union(set(exclude_patterns))
+
+    def should_exclude(p: Path) -> bool:
+        rel = str(p.relative_to(project_root))
+        for pattern in all_excludes:
+            if fnmatch(rel, pattern) or fnmatch(p.name, pattern):
+                return True
+            if any(fnmatch(part, pattern) for part in p.parts):
+                return True
+        return False
+
+    py_files = [p for p in project_root.rglob("*.py") if not should_exclude(p)]
+
+    changed: list[Path] = []
+    for p in py_files:
+        try:
+            if p.stat().st_mtime > graph_mtime:
+                changed.append(p)
+        except OSError:
+            continue
+
+    cache = FileCache(project_root)
+    cache.load()
+    prev_files = {Path(k) for k in cache._hashes.keys() if k.endswith(".py")}
+
+    current_set = {p.resolve() for p in py_files}
+    added = [p for p in current_set if p not in prev_files and p.stat().st_mtime > graph_mtime]
+    removed = [p for p in prev_files if p not in current_set]
+
+    is_stale = bool(changed or added or removed)
+
+    if is_stale:
+        parts = []
+        if changed:
+            parts.append(f"{len(changed)} file(s) modified")
+        if added:
+            parts.append(f"{len(added)} file(s) added")
+        if removed:
+            parts.append(f"{len(removed)} file(s) removed")
+
+        recommendation = (
+            f"Graph is stale: {', '.join(parts)} since last scan. "
+            "Call `constrictor_rescan_graph` to update before running impact analysis."
+        )
+    else:
+        if seconds_since > 3600:
+            recommendation = (
+                f"Graph is {int(seconds_since / 60)} minutes old. Consider rescanning if you've made recent edits."
+            )
+        else:
+            recommendation = "Graph is up-to-date."
+
+    return StalenessResult(
+        is_stale=is_stale,
+        graph_path=str(graph_path),
+        graph_mtime=graph_mtime,
+        changed_files=changed,
+        added_files=added,
+        removed_files=removed,
+        total_scanned_files=len(py_files),
+        seconds_since_scan=seconds_since,
+        recommendation=recommendation,
+    )

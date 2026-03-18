@@ -50,7 +50,37 @@ Add to your agent config (e.g. `.claude/mcp.json`, `~/.cursor/mcp.json`):
 | `constrictor_dependents` | Find all dependents of a file |
 | `constrictor_audit` | List ambiguous / unresolved edges |
 | `constrictor_rescan_graph` | Rebuild `graph.json` in place after editing code |
+| `constrictor_check_staleness` | Check if graph is stale relative to source files |
 | `constrictor_summary` | Human-readable graph summary + statistics |
+
+### Graph Staleness Detection
+
+The dependency graph goes stale when source files change after the last scan. Running impact analysis on a stale graph produces inaccurate results.
+
+**Before any impact analysis, agents should check staleness:**
+
+```json
+// 1. Check if graph is stale
+constrictor_check_staleness({ "graph_path": "graph.json" })
+
+// Response:
+{
+  "is_stale": true,
+  "changed_file_count": 3,
+  "recommendation": "Graph is stale: 3 file(s) modified since last scan. Call `constrictor_rescan_graph` to update."
+}
+
+// 2. If stale, rescan before proceeding
+constrictor_rescan_graph({ "graph_path": "graph.json" })
+
+// 3. Now run impact analysis with accurate data
+constrictor_impact({ "node": "process_order", "graph_path": "graph.json" })
+```
+
+**Why this matters:**
+- A stale graph won't reflect new imports, function calls, or class hierarchies
+- Impact analysis on stale data will miss downstream dependents
+- Agents may give incorrect refactoring advice based on outdated topology
 
 **SSE transport** (for HTTP-based agent runtimes):
 ```bash
@@ -66,6 +96,18 @@ constrictor agent skill -o SKILL.md
 ```
 
 ### Common agent workflows
+
+**Staleness-aware impact analysis (recommended):**
+```bash
+# 1. Check if graph is stale
+constrictor_check_staleness --graph graph.json
+
+# 2. If stale, rescan first
+constrictor_rescan_graph --graph graph.json
+
+# 3. Then run impact analysis
+constrictor impact --node "app.services::process_order" --graph graph.json
+```
 
 **Before refactoring:**
 ```bash
