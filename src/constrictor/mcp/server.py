@@ -107,9 +107,7 @@ def create_server(
         return get_tool_definitions()
 
     @server.call_tool()
-    async def call_tool(
-        name: str, arguments: dict[str, Any]
-    ) -> list[types.TextContent]:  # type: ignore[return]
+    async def call_tool(name: str, arguments: dict[str, Any]) -> list[types.TextContent]:  # type: ignore[return]
         try:
             return await _dispatch(name, arguments, default_graph_path, auto_rescan)
         except FileNotFoundError as exc:
@@ -138,15 +136,13 @@ async def _dispatch(
     raw_graph_path = args.get("graph_path") or default_graph_path
     if not raw_graph_path:
         return _error_text(
-            "graph_path is required. Either pass it as an argument or start the "
-            "server with --graph <path>."
+            "graph_path is required. Either pass it as an argument or start the server with --graph <path>."
         )
 
     graph_path = _resolve_graph_path(raw_graph_path)
     if graph_path is None:
         return _error_text(
-            f"No graph file found at {raw_graph_path!r}. "
-            "Run 'constrictor scan <project> -o graph.json' first."
+            f"No graph file found at {raw_graph_path!r}. Run 'constrictor scan <project> -o graph.json' first."
         )
 
     if auto_rescan and default_graph_path:
@@ -177,6 +173,8 @@ async def _dispatch(
         return await _tool_cycles(args, graph_path)
     if name == "constrictor_rescan_graph":
         return await _tool_rescan_graph(args, graph_path)
+    if name == "constrictor_check_staleness":
+        return await _tool_check_staleness(args, graph_path)
 
     return _error_text(f"Unknown tool: {name}")
 
@@ -195,6 +193,7 @@ def _do_auto_rescan(graph_path: str) -> None:
 
 
 # ── Individual tool handlers ──────────────────────────────────────────────────
+
 
 async def _tool_scan(args: dict[str, Any]) -> list[types.TextContent]:
     project_path = args.get("project_path")
@@ -452,8 +451,7 @@ async def _tool_diff_impact(args: dict[str, Any], graph_path: str) -> list[types
 
     if not diff_text and not changes:
         return _error_text(
-            "Either 'diff' (unified diff string) or 'changes' "
-            "(list of {file_path, line_start, line_end}) is required."
+            "Either 'diff' (unified diff string) or 'changes' (list of {file_path, line_start, line_end}) is required."
         )
 
     try:
@@ -590,10 +588,7 @@ async def _tool_rescan_graph(args: dict[str, Any], graph_path: str) -> list[type
     """
     gp = Path(graph_path)
     if not gp.exists():
-        return _error_text(
-            f"Graph file not found: {graph_path}. "
-            "Run 'constrictor scan <project> -o graph.json' first."
-        )
+        return _error_text(f"Graph file not found: {graph_path}. Run 'constrictor scan <project> -o graph.json' first.")
 
     # Recover the original project root from the graph's own metadata.
     try:
@@ -607,8 +602,7 @@ async def _tool_rescan_graph(args: dict[str, Any], graph_path: str) -> list[type
 
     if not project_root.exists():
         return _error_text(
-            f"Project root does not exist: {project_root}. "
-            "The graph may have been created on a different machine."
+            f"Project root does not exist: {project_root}. The graph may have been created on a different machine."
         )
 
     incremental: bool = args.get("incremental", True)
@@ -632,7 +626,52 @@ async def _tool_rescan_graph(args: dict[str, Any], graph_path: str) -> list[type
     return _json_text(result)
 
 
+async def _tool_check_staleness(args: dict[str, Any], graph_path: str) -> list[types.TextContent]:
+    """Check if the graph is stale relative to source files."""
+    from constrictor.core.cache import check_graph_staleness
+
+    gp = Path(graph_path)
+    if not gp.exists():
+        return _error_text(f"Graph file not found: {graph_path}")
+
+    project_path: str | None = args.get("project_path")
+    exclude_patterns: list[str] = args.get("exclude_patterns") or []
+
+    if project_path:
+        project_root = Path(project_path)
+    else:
+        try:
+            existing = load_json(gp)
+            if existing.scan_metadata and existing.scan_metadata.root_path:
+                project_root = Path(existing.scan_metadata.root_path)
+            else:
+                project_root = gp.parent
+        except Exception:
+            project_root = gp.parent
+
+    if not project_root.exists():
+        return _error_text(f"Project root does not exist: {project_root}")
+
+    result_obj = check_graph_staleness(gp, project_root, exclude_patterns=exclude_patterns)
+
+    result = {
+        "is_stale": result_obj.is_stale,
+        "graph_path": result_obj.graph_path,
+        "seconds_since_scan": round(result_obj.seconds_since_scan, 1),
+        "total_source_files": result_obj.total_scanned_files,
+        "changed_file_count": len(result_obj.changed_files),
+        "added_file_count": len(result_obj.added_files),
+        "removed_file_count": len(result_obj.removed_files),
+        "changed_files": [str(p) for p in result_obj.changed_files[:20]],
+        "added_files": [str(p) for p in result_obj.added_files[:20]],
+        "removed_files": [str(p) for p in result_obj.removed_files[:20]],
+        "recommendation": result_obj.recommendation,
+    }
+    return _json_text(result)
+
+
 # ── Transport runners ─────────────────────────────────────────────────────────
+
 
 async def run_stdio(
     default_graph_path: str | None = None,
@@ -661,11 +700,11 @@ async def run_sse(
 
     async def handle_sse(request: Any) -> Any:
         async with sse.connect_sse(
-            request.scope, request.receive, request._send  # type: ignore[attr-defined]
+            request.scope,
+            request.receive,
+            request._send,  # type: ignore[attr-defined]
         ) as streams:
-            await server.run(
-                streams[0], streams[1], server.create_initialization_options()
-            )
+            await server.run(streams[0], streams[1], server.create_initialization_options())
 
     starlette_app = Starlette(
         routes=[

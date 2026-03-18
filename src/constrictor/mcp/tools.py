@@ -30,8 +30,7 @@ def get_tool_definitions() -> list[types.Tool]:
                     "output_path": {
                         "type": "string",
                         "description": (
-                            "Optional path to write graph.json. "
-                            "If omitted the graph is kept in memory only."
+                            "Optional path to write graph.json. If omitted the graph is kept in memory only."
                         ),
                     },
                     "exclude_patterns": {
@@ -75,10 +74,7 @@ def get_tool_definitions() -> list[types.Tool]:
                     "direction": {
                         "type": "string",
                         "enum": ["downstream", "upstream"],
-                        "description": (
-                            "downstream: what does this node affect? "
-                            "upstream: what depends on this node?"
-                        ),
+                        "description": ("downstream: what does this node affect? upstream: what depends on this node?"),
                         "default": "downstream",
                     },
                     "max_depth": {
@@ -107,7 +103,7 @@ def get_tool_definitions() -> list[types.Tool]:
                         "items": {"type": "string"},
                         "description": (
                             "Only traverse edges of these types during BFS. "
-                            "E.g. [\"CALLS\"] to restrict to call-graph edges only. "
+                            'E.g. ["CALLS"] to restrict to call-graph edges only. '
                             "Valid values: IMPORTS, IMPORTS_FROM, CALLS, INHERITS, IMPLEMENTS, "
                             "CONTAINS, EXPOSES_ENDPOINT, CALLS_HTTP, FOREIGN_KEY, TYPE_ANNOTATED."
                         ),
@@ -260,7 +256,7 @@ def get_tool_definitions() -> list[types.Tool]:
                         "type": "array",
                         "items": {"type": "string"},
                         "description": (
-                            "Restrict results to these node types, e.g. [\"FUNCTION\", \"CLASS\"]. "
+                            'Restrict results to these node types, e.g. ["FUNCTION", "CLASS"]. '
                             "Valid values: MODULE, PACKAGE, CLASS, FUNCTION, METHOD, ENDPOINT, "
                             "VARIABLE, SQLALCHEMY_MODEL, TABLE, EXTERNAL_MODULE, EXTERNAL_SERVICE, "
                             "EXTERNAL_ENDPOINT, SERVICE, COMPONENT, JS_MODULE, JS_FUNCTION, JS_COMPONENT."
@@ -318,8 +314,7 @@ def get_tool_definitions() -> list[types.Tool]:
                     "file_path": {
                         "type": "string",
                         "description": (
-                            "Path to the file to inspect. "
-                            "Should match the file_path values stored in the graph."
+                            "Path to the file to inspect. Should match the file_path values stored in the graph."
                         ),
                     },
                 },
@@ -345,8 +340,7 @@ def get_tool_definitions() -> list[types.Tool]:
                     "diff": {
                         "type": "string",
                         "description": (
-                            "A unified diff string (output of `git diff`). "
-                            "Mutually exclusive with `changes`."
+                            "A unified diff string (output of `git diff`). Mutually exclusive with `changes`."
                         ),
                     },
                     "changes": {
@@ -392,23 +386,19 @@ def get_tool_definitions() -> list[types.Tool]:
                     "node_types": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": (
-                            "Node types to check. Defaults to [\"FUNCTION\", \"METHOD\", \"CLASS\"]."
-                        ),
+                        "description": ('Node types to check. Defaults to ["FUNCTION", "METHOD", "CLASS"].'),
                     },
                     "exclude_patterns": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": (
-                            "fnmatch globs for file paths to skip, e.g. [\"tests/*\", \"**/__init__.py\"]."
-                        ),
+                        "description": ('fnmatch globs for file paths to skip, e.g. ["tests/*", "**/__init__.py"].'),
                     },
                     "entry_points": {
                         "type": "array",
                         "items": {"type": "string"},
                         "description": (
                             "Node name patterns to treat as 'used' even with no incoming edges. "
-                            "Supports fnmatch globs, e.g. [\"main\", \"cli_*\", \"handle_*\"]."
+                            'Supports fnmatch globs, e.g. ["main", "cli_*", "handle_*"].'
                         ),
                     },
                 },
@@ -479,8 +469,8 @@ def get_tool_definitions() -> list[types.Tool]:
                         "items": {"type": "string"},
                         "description": (
                             "Edge types to include in cycle detection. "
-                            "Defaults to [\"IMPORTS\", \"IMPORTS_FROM\"]. "
-                            "Other useful values: \"CALLS\", \"INHERITS\"."
+                            'Defaults to ["IMPORTS", "IMPORTS_FROM"]. '
+                            'Other useful values: "CALLS", "INHERITS".'
                         ),
                     },
                 },
@@ -519,6 +509,41 @@ def get_tool_definitions() -> list[types.Tool]:
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "Additional glob patterns to exclude from the scan.",
+                    },
+                },
+                "required": [],
+            },
+        ),
+        types.Tool(
+            name="constrictor_check_staleness",
+            description=(
+                "Check if graph.json is stale relative to source files. "
+                "Returns whether the graph is up-to-date, which files changed since "
+                "the last scan, and a recommendation. Agents should call this before "
+                "impact analysis to ensure results are accurate. "
+                "If is_stale=true, call constrictor_rescan_graph before proceeding."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "graph_path": {
+                        "type": "string",
+                        "description": (
+                            "Path to the graph.json file to check. "
+                            "If omitted the server's default --graph path is used."
+                        ),
+                    },
+                    "project_path": {
+                        "type": "string",
+                        "description": (
+                            "Optional project root. If omitted, recovered from graph metadata "
+                            "or inferred as the parent directory of graph.json."
+                        ),
+                    },
+                    "exclude_patterns": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Additional glob patterns to exclude from staleness check.",
                     },
                 },
                 "required": [],

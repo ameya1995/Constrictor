@@ -46,7 +46,7 @@ def graph_file(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 def test_tool_definitions_count() -> None:
     tools = get_tool_definitions()
-    assert len(tools) == 13
+    assert len(tools) == 14
 
 
 def test_tool_names() -> None:
@@ -65,6 +65,7 @@ def test_tool_names() -> None:
         "constrictor_batch_impact",
         "constrictor_cycles",
         "constrictor_rescan_graph",
+        "constrictor_check_staleness",
     }
     assert names == expected
 
@@ -140,9 +141,7 @@ async def test_impact_downstream(graph_file: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_impact_upstream(graph_file: Path) -> None:
-    result = await _tool_impact(
-        {"node": "greet", "direction": "upstream"}, str(graph_file)
-    )
+    result = await _tool_impact({"node": "greet", "direction": "upstream"}, str(graph_file))
     data = json.loads(result[0].text)
     assert "focus_node" in data
 
@@ -190,9 +189,7 @@ async def test_paths_missing_args(graph_file: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_paths_unknown_node(graph_file: Path) -> None:
-    result = await _tool_paths(
-        {"from_node": "zzz_no_such", "to_node": "app.utils"}, str(graph_file)
-    )
+    result = await _tool_paths({"from_node": "zzz_no_such", "to_node": "app.utils"}, str(graph_file))
     assert result[0].text.startswith("ERROR:")
 
 
@@ -269,9 +266,7 @@ async def test_dispatch_missing_graph_path() -> None:
 
 @pytest.mark.asyncio
 async def test_dispatch_scan_no_graph_needed() -> None:
-    result = await _dispatch(
-        "constrictor_scan", {"project_path": str(FIXTURE_DIR)}, None, False
-    )
+    result = await _dispatch("constrictor_scan", {"project_path": str(FIXTURE_DIR)}, None, False)
     data = json.loads(result[0].text)
     assert "statistics" in data
 
