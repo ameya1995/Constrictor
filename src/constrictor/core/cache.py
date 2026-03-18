@@ -316,8 +316,8 @@ def check_graph_staleness(
     Returns:
         StalenessResult with details about what changed and a recommendation.
     """
-    from fnmatch import fnmatch
     import time
+    from fnmatch import fnmatch
 
     if not graph_path.exists():
         return StalenessResult(
